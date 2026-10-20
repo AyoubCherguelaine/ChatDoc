@@ -1,0 +1,72 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: docuchat-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: docuchat123
+      POSTGRES_DB: docuchat
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./backend/init/00-pgcrypto.sql:/docker-entrypoint-initdb.d/00-pgcrypto.sql:ro
+      - ./backend/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "docuchat"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: docuchat-backend
+    environment:
+      DATABASE_URL: postgresql://postgres:docuchat123@db:5432/docuchat
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      CHAT_MODELS: ${CHAT_MODELS:-}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-4o}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
+      UPLOAD_DIR: /app/backend/uploads
+      INDEX_DIR: /app/backend/faiss_indexes
+    volumes:
+      - uploads_data:/app/backend/uploads
+      - indexes_data:/app/backend/faiss_indexes
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=3).status==200 else 1)"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 5s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: docuchat-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      NEXT_PUBLIC_APP_NAME: DocuChat
+      NEXTAUTH_URL: http://localhost:3000
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+volumes:
+  db_data:
+  uploads_data:
+  indexes_data:

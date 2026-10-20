@@ -1,0 +1,15 @@
+.git
+.gitignore
+frontend/
+tests/
+venv/
+__pycache__/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.env
+.env-example
+backend/.env
+backend/faiss_indexes/
+backend/uploads/
+*.log

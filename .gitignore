@@ -1,2 +1,13 @@
 .env
+backend/.env
+backend/uploads/
+backend/faiss_indexes/
 venv
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+# Local browser verification artifacts
+.playwright-cli/
+output/

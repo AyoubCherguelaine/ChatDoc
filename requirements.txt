@@ -1,9 +1,41 @@
-streamlit 
-pypdf2 
-langchain 
-langchain_community
-langchain_google_genai
-python-dotenv 
-faiss-cpu 
-openai 
-huggingface_hub
+# Backend API (FastAPI) + auth + database
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.9
+python-dotenv>=1.0.0
+psycopg2-binary>=2.9
+bcrypt>=4.1
+PyJWT>=2.8
+
+# PDF processing — PyMuPDF for perfect text quality + page-level access
+pymupdf>=1.24.0
+
+# Fallback PDF parser
+pypdf>=4.2.0
+
+# LLM frameworks
+langchain>=1.0.0
+langchain-community>=0.4.0
+langchain-openai>=0.1.0
+
+# Embeddings & Vector store
+openai>=1.30.0
+faiss-cpu>=1.7.4
+rank_bm25>=0.1.0
+
+# Optional — local LLM (Ollama)
+langchain-ollama>=0.1.0
+
+# Environment
+python-dotenv>=1.0.0
+
+# Development
+pytest>=8.0.0
+pytest-asyncio>=0.23.0
+ruff>=0.4.0
+mypy>=1.10.0
+
+# Word and Excel ingestion
+python-docx>=1.2.0
+openpyxl>=3.1.5
+xlrd>=2.0.1
