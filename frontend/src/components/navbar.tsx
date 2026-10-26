@@ -6,6 +6,8 @@ import {
   Files,
   MessageSquare,
   Sparkles,
+  Bot,
+  Key,
   LogOut,
   ArrowUpRight,
   PanelLeftClose,
@@ -27,6 +29,8 @@ export function Navbar() {
     { href: "/drive?view=documents", label: "All documents", icon: Files },
     { href: "/conversations", label: "Conversations", icon: MessageSquare },
     { href: "/agents", label: "AI studio", icon: Sparkles },
+    { href: "/services", label: "AI Services", icon: Bot },
+    { href: "/usage", label: "API & Credits", icon: Key },
   ];
   return (
     <>
@@ -83,10 +87,10 @@ export function Navbar() {
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-3 text-[13px] font-medium text-[#77858b] transition-colors hover:bg-slate-100",
                 (href.includes("?")
-                  ? pathname === "/drive" && search.get("view") === "documents"
+                  ? pathname === "/drive" && search?.get("view") === "documents"
                   : pathname === href &&
                     !(
-                      href === "/drive" && search.get("view") === "documents"
+                      href === "/drive" && search?.get("view") === "documents"
                     )) && "bg-[#e9f4ef] !text-[#087f74]",
               )}
             >
@@ -95,6 +99,11 @@ export function Navbar() {
               {label === "AI studio" && (
                 <span className="ml-auto rounded border border-[#d9e6d8] bg-[#f1f6e9] px-1.5 py-0.5 text-[8px] text-[#74825a]">
                   TOOLS
+                </span>
+              )}
+              {label === "API & Credits" && (
+                <span className="ml-auto rounded border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[8px] font-semibold text-teal-700">
+                  1.2k Free
                 </span>
               )}
             </Link>

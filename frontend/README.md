@@ -1,4 +1,4 @@
-# DocuChat frontend
+# DOCTool frontend
 
 Next.js App Router, React, TypeScript, Tailwind, and Lucide. The interface uses an ink, teal, and sage palette across the landing page, authentication, document library, conversations, AI studio, and chat.
 

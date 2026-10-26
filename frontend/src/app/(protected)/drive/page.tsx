@@ -24,10 +24,72 @@ import {
   List,
   RefreshCw,
   ArrowRight,
+  Receipt,
+  ShieldBan,
+  FileSignature,
+  TrendingUp,
+  Coins,
 } from "lucide-react";
 import { formatBytes } from "@/lib/utils";
 import { workflows } from "@/lib/workflows";
 import type { Document, ChatSession } from "@/lib/types";
+import { fetchCompanyAccount, type CompanyAccount } from "@/lib/api";
+import { ServiceLauncherModal, type ServiceCardInfo } from "@/components/services/service-modal";
+
+const featuredServices: ServiceCardInfo[] = [
+  {
+    id: "invoice",
+    title: "Invoice Processing",
+    category: "finance",
+    description: "Extract line items, tax IDs, and totals with math check.",
+    badge: "JSON Verified",
+    credits: 25,
+    llmTier: "JSON Strict Schema",
+    icon: <Receipt size={18} />,
+    workflowId: "invoice",
+    color: "bg-[#ecfdf5] text-[#059669]",
+    detail: "Vendor, client, dates, amounts, taxes — verified output.",
+  },
+  {
+    id: "redaction",
+    title: "Bilingual PII Redaction",
+    category: "legal",
+    description: "Mask Saudi National IDs, GCC IBANs, and ZATCA VAT numbers.",
+    badge: "Bilingual PII",
+    credits: 25,
+    llmTier: "Bilingual Masking",
+    icon: <ShieldBan size={18} />,
+    workflowId: "redaction",
+    color: "bg-[#fef2f2] text-[#dc2626]",
+    detail: "Deterministic & LLM masking for Saudi IDs, GCC IBANs, emails, phones.",
+  },
+  {
+    id: "contract",
+    title: "Contract Analysis",
+    category: "legal",
+    description: "Identify parties, clauses, liabilities, and flag risk factors.",
+    badge: "Risk Engine",
+    credits: 35,
+    llmTier: "Legal Clause Analysis",
+    icon: <FileSignature size={18} />,
+    workflowId: "contract",
+    color: "bg-[#eff6ff] text-[#2563eb]",
+    detail: "Clause extraction, indemnification, termination, and risk alerts.",
+  },
+  {
+    id: "financial_statement",
+    title: "Financial Statement",
+    category: "finance",
+    description: "Analyze Income Statement & Balance Sheet metrics and solvency.",
+    badge: "Balance & P&L",
+    credits: 35,
+    llmTier: "Financial Ratio Engine",
+    icon: <TrendingUp size={18} />,
+    workflowId: "financial_statement",
+    color: "bg-[#f0fdf4] text-[#16a34a]",
+    detail: "Revenue, Gross Profit, EBIT, Net Income, and solvency ratios.",
+  },
+];
 export default function DrivePage() {
   const { user } = useSession();
   const params = useSearchParams();
@@ -41,10 +103,14 @@ export default function DrivePage() {
   const [sort, setSort] = useState("recent");
   const [layout, setLayout] = useState("grid");
   const [sessionError, setSessionError] = useState(false);
+  const [account, setAccount] = useState<CompanyAccount | null>(null);
+  const [activeService, setActiveService] = useState<ServiceCardInfo | null>(null);
+
   const loadDocs = useCallback(async () => {
     setLoading(true);
     setError("");
     setSessionError(false);
+    void fetchCompanyAccount().then(setAccount).catch(() => null);
     try {
       const d = await fetchDocuments();
       setDocs(d);
@@ -79,13 +145,13 @@ export default function DrivePage() {
     )
     .sort((a, b) =>
       sort === "name"
-        ? a.originalFilename.localeCompare(b.originalFilename)
+        ? (a.originalFilename || "").localeCompare(b.originalFilename || "")
         : sort === "size"
-          ? b.fileSize - a.fileSize
-          : b.createdAt.localeCompare(a.createdAt),
+          ? (b.fileSize || 0) - (a.fileSize || 0)
+          : (b.createdAt || "").localeCompare(a.createdAt || ""),
     );
   const icons = [Sparkles, FileSearch, FileSpreadsheet, ListChecks];
-  const library = params.get("view") === "documents";
+  const library = params?.get("view") === "documents";
   return (
     <div className="mx-auto max-w-[1500px] animate-enter">
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -126,13 +192,13 @@ export default function DrivePage() {
           },
           {
             label: "Pages & sections",
-            value: docs.reduce((n, d) => n + d.pageCount, 0),
+            value: docs.reduce((n, d) => n + (d.pageCount || 0), 0),
             icon: FileSearch,
             note: "Ready to explore",
           },
           {
             label: "Storage used",
-            value: formatBytes(docs.reduce((n, d) => n + d.fileSize, 0)),
+            value: formatBytes(docs.reduce((n, d) => n + (d.fileSize || 0), 0)),
             icon: HardDrive,
             note: "PDF, Word, Excel & more",
           },
@@ -216,39 +282,48 @@ export default function DrivePage() {
           </div>
           <section className="mb-9">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-sm font-semibold">
-                A head start on your next task
-              </h2>
+              <div>
+                <h2 className="text-sm font-semibold">
+                  Featured Document AI Services
+                </h2>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Launch with local files or choose from your drive library
+                </p>
+              </div>
               <Link
-                href="/agents"
-                className="flex gap-1 text-xs text-slate-400"
+                href="/services"
+                className="flex items-center gap-1 text-xs text-teal-700 font-medium hover:underline"
               >
-                AI studio <ArrowUpRight size={13} />
+                All 19 AI Services <ArrowUpRight size={13} />
               </Link>
             </div>
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {workflows.map((w, i) => {
-                const Icon = icons[i];
-                return (
-                  <Link
-                    key={w.id}
-                    href={`/agents?workflow=${w.id}`}
-                    className="surface group flex gap-3 p-4 transition hover:-translate-y-0.5 hover:border-[#aacdbf]"
+              {featuredServices.map((svc) => (
+                <button
+                  key={svc.id}
+                  onClick={() => setActiveService(svc)}
+                  className="surface group flex gap-3.5 p-4 text-left transition hover:-translate-y-0.5 hover:border-teal-400 hover:shadow-xs"
+                >
+                  <span
+                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-xs transition group-hover:scale-105 ${svc.color}`}
                   >
-                    <span
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${["bg-[#eef4e8] text-[#7a925b]", "bg-[#eaf1fa] text-[#7197be]", "bg-[#fbefe6] text-[#c79773]", "bg-[#f1edfa] text-[#9c87bf]"][i]}`}
-                    >
-                      <Icon size={17} />
-                    </span>
-                    <div>
-                      <p className="text-xs font-semibold">{w.title}</p>
-                      <p className="mt-1.5 text-[10px] leading-4 text-slate-400">
-                        {w.description}
+                    {svc.icon}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="truncate text-xs font-semibold text-slate-900 group-hover:text-teal-900">
+                        {svc.title}
                       </p>
+                      <span className="text-[9px] font-semibold text-teal-700 uppercase shrink-0">
+                        {svc.credits}c
+                      </span>
                     </div>
-                  </Link>
-                );
-              })}
+                    <p className="mt-1 text-[11px] leading-4 text-slate-400 line-clamp-2">
+                      {svc.description}
+                    </p>
+                  </div>
+                </button>
+              ))}
             </div>
           </section>
         </>
@@ -411,6 +486,18 @@ export default function DrivePage() {
         <span>YOUR KNOWLEDGE. A LITTLE MORE CONNECTED.</span>
         <span>PDF · Word · Excel · CSV · Text</span>
       </footer>
+
+      {/* Service Source Picker & Direct Runner Modal */}
+      <ServiceLauncherModal
+        service={activeService}
+        open={Boolean(activeService)}
+        onClose={() => setActiveService(null)}
+        docs={docs}
+        onDocumentAdded={(newDoc) => {
+          setDocs((prev) => [newDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
+        }}
+        remainingCredits={account?.remainingCredits}
+      />
     </div>
   );
 }

@@ -14,8 +14,83 @@ import {
   Search,
   Plus,
   Paperclip,
+  Receipt,
+  FileSignature,
+  CreditCard,
+  ShieldAlert,
+  UserCheck,
+  ClipboardCheck,
+  SearchCheck,
+  Zap,
 } from "lucide-react";
 import { Brand } from "@/components/brand";
+
+const documentAIServices = [
+  {
+    title: "Invoice Processing",
+    badge: "JSON Verified",
+    description: "Extract line items, tax IDs, payment terms, and totals with math checks.",
+    icon: Receipt,
+    color: "bg-[#ecfdf5] text-[#059669]",
+    tags: ["Vendor details", "Line items", "Totals check"],
+  },
+  {
+    title: "Receipt & Expenses",
+    badge: "Expense AI",
+    description: "Parse store receipts, meal vouchers, travel expenses, tips, and categories.",
+    icon: CreditCard,
+    color: "bg-[#f0fdf4] text-[#16a34a]",
+    tags: ["Merchant", "Tax breakdown", "Expense taxonomy"],
+  },
+  {
+    title: "Contract Analysis",
+    badge: "Risk Engine",
+    description: "Identify signatories, terms, indemnification, liabilities, and risk clauses.",
+    icon: FileSignature,
+    color: "bg-[#eff6ff] text-[#2563eb]",
+    tags: ["Parties", "Key clauses", "Risk alerts"],
+  },
+  {
+    title: "PII & Compliance Audit",
+    badge: "GDPR & HIPAA",
+    description: "Detect sensitive PII, credential leaks, regulatory exposure, and preview redactions.",
+    icon: ShieldAlert,
+    color: "bg-[#fef2f2] text-[#dc2626]",
+    tags: ["SSN & Card detection", "0-100 Risk score", "Masked preview"],
+  },
+  {
+    title: "Resume & Talent Intelligence",
+    badge: "Talent AI",
+    description: "Candidate profiling, skills taxonomy, work history, and seniority assessment.",
+    icon: UserCheck,
+    color: "bg-[#f5f3ff] text-[#7c3aed]",
+    tags: ["Skills taxonomy", "Career timeline", "Seniority level"],
+  },
+  {
+    title: "Intelligent Form Parser",
+    badge: "Form AI",
+    description: "Extract form key-values, checkbox states ([X] / [ ]), and signatures.",
+    icon: ClipboardCheck,
+    color: "bg-[#fff7ed] text-[#ea580c]",
+    tags: ["Key-values", "Checkbox detection", "Signature status"],
+  },
+  {
+    title: "Google AI Multimodal",
+    badge: "Multimodal",
+    description: "Deep document understanding, layout parsing, entities, and complex reasoning.",
+    icon: Bot,
+    color: "bg-[#e8f0fe] text-[#1a73e8]",
+    tags: ["Layout hierarchy", "Entity extraction", "Multimodal OCR"],
+  },
+  {
+    title: "Deep Research & Citations",
+    badge: "Grounded RAG",
+    description: "Investigate claims, cross-reference pages, and verify facts with citations.",
+    icon: SearchCheck,
+    color: "bg-[#fdf4ff] text-[#c026d3]",
+    tags: ["Hybrid search", "Page citations", "Evidence brief"],
+  },
+];
 
 const features = [
   {
@@ -45,6 +120,9 @@ export default function Home() {
         >
           <a href="#workspace" className="hover:text-teal-700">
             The workspace
+          </a>
+          <a href="#services" className="hover:text-teal-700">
+            AI Services
           </a>
           <a href="#features" className="hover:text-teal-700">
             Features
@@ -178,7 +256,7 @@ export default function Home() {
                       </span>
                       <div>
                         <p className="text-[10px] font-semibold">
-                          DocuChat{" "}
+                          DOCTool{" "}
                           <span className="ml-1 font-normal text-slate-400">
                             Illustrative preview
                           </span>
@@ -248,6 +326,108 @@ export default function Home() {
               {x}
             </span>
           ))}
+        </section>
+        <section id="services" className="mx-auto max-w-[1184px] px-6 py-24 border-b border-[#e7ebe5]">
+          <div className="mb-12 flex flex-wrap items-end justify-between gap-5">
+            <div>
+              <p className="eyebrow">Enterprise Document AI Suite</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl text-slate-900">
+                Specialized AI services for every document type.
+              </h2>
+            </div>
+            <div className="flex flex-col items-start gap-3 sm:items-end">
+              <p className="max-w-md text-sm leading-6 text-slate-500">
+                Turn complex, unstructured files into structured, verified data with autonomous specialist agents.
+              </p>
+              <Link
+                href="/services"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700 hover:text-teal-800"
+              >
+                Launch in Services Workspace <ArrowRight size={15} />
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {documentAIServices.map(({ title, badge, description, icon: Icon, color, tags }) => (
+              <div
+                key={title}
+                className="group flex flex-col justify-between rounded-2xl border border-[#e2e9e1] bg-white p-6 shadow-xs transition hover:-translate-y-1 hover:border-slate-300 hover:shadow-md"
+              >
+                <div>
+                  <div className="mb-4 flex items-center justify-between">
+                    <span className={`flex h-11 w-11 items-center justify-center rounded-xl transition group-hover:scale-105 ${color}`}>
+                      <Icon size={22} />
+                    </span>
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                      {badge}
+                    </span>
+                  </div>
+                  <h3 className="text-base font-semibold text-slate-900 group-hover:text-teal-800 transition">
+                    {title}
+                  </h3>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">
+                    {description}
+                  </p>
+                </div>
+
+                <div className="mt-5 border-t border-slate-100 pt-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    {tags.map((tag) => (
+                      <span
+                        key={tag}
+                        className="rounded bg-slate-50 px-2 py-0.5 text-[10px] text-slate-500 border border-slate-100"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Company API & Free Trial Banner */}
+          <div className="mt-12 overflow-hidden rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-900 via-[#183a38] to-slate-900 p-8 text-white shadow-xl">
+            <div className="grid gap-6 md:grid-cols-12 md:items-center">
+              <div className="md:col-span-8">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-800/80 px-3 py-1 text-xs font-semibold text-teal-200 border border-teal-700">
+                  <Zap size={13} className="text-emerald-400" /> Free Trial Available Only
+                </span>
+                <h3 className="mt-3 text-2xl font-bold tracking-tight text-white">
+                  1,200 Free Trial API Credits for Every Company
+                </h3>
+                <p className="mt-2 text-sm text-teal-100/90 leading-relaxed max-w-xl">
+                  Test every Document AI capability with instant live API keys. Pay strictly by LLM compute usage — from 5 credits for conversational retrieval to 25 for verified invoices and 35 for contract risk analysis.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-4 text-xs text-teal-200">
+                  <span className="flex items-center gap-1.5">
+                    <Check size={14} className="text-emerald-400" /> Instant API Key generation
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Check size={14} className="text-emerald-400" /> 1,200 initial credits included
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <Check size={14} className="text-emerald-400" /> Zero credit card required
+                  </span>
+                </div>
+              </div>
+              <div className="md:col-span-4 flex flex-col sm:items-end gap-3">
+                <Link
+                  href="/login?mode=signup"
+                  className="inline-flex items-center gap-2 rounded-lg bg-emerald-400 px-5 py-3 text-sm font-semibold text-slate-950 shadow-md hover:bg-emerald-300 transition"
+                >
+                  Claim 1,200 Free Credits <ArrowRight size={16} />
+                </Link>
+                <Link
+                  href="/usage"
+                  className="text-xs font-medium text-teal-200 hover:text-white transition"
+                >
+                  View API pricing & documentation ↗
+                </Link>
+              </div>
+            </div>
+          </div>
         </section>
         <section id="features" className="mx-auto max-w-[1184px] px-6 py-24">
           <div className="mb-12 flex flex-wrap items-end justify-between gap-5">

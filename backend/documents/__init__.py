@@ -6,6 +6,14 @@ from .splitter import (
     split_documents,
     split_pages_semantically,
 )
+from .structure import (
+    Heading,
+    TableExtract,
+    extract_outline,
+    extract_tables,
+    extract_text_outline,
+    get_outline_for_document,
+)
 
 __all__ = [
     "load_pdf",
@@ -18,4 +26,10 @@ __all__ = [
     "split_pages_semantically",
     "DocumentProcessor",
     "ProcessingConfig",
+    "extract_outline",
+    "extract_tables",
+    "extract_text_outline",
+    "get_outline_for_document",
+    "Heading",
+    "TableExtract",
 ]

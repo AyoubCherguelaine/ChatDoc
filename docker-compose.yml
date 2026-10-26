@@ -19,6 +19,54 @@ services:
       retries: 20
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    container_name: docuchat-redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    container_name: docuchat-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  createbuckets:
+    image: minio/mc:latest
+    container_name: docuchat-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/docuchat-documents || true;
+      /usr/bin/mc anonymous set download myminio/docuchat-documents || true;
+      exit 0;
+      "
+
   backend:
     build:
       context: .
@@ -26,11 +74,18 @@ services:
     container_name: docuchat-backend
     environment:
       DATABASE_URL: postgresql://postgres:docuchat123@db:5432/docuchat
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: docuchat-documents
+      MINIO_SECURE: "0"
+      STORAGE_BACKEND: auto
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       CHAT_MODELS: ${CHAT_MODELS:-}
       DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-4o}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
+      JWT_SECRET: ${JWT_SECRET:-docuchat-production-secret-key-32bytes-minimum-security-token-2026}
       ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
       UPLOAD_DIR: /app/backend/uploads
       INDEX_DIR: /app/backend/faiss_indexes
@@ -40,6 +95,10 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     ports:
       - "8000:8000"
     healthcheck:
@@ -48,6 +107,38 @@ services:
       timeout: 5s
       retries: 15
       start_period: 5s
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: docuchat-worker
+    command: python -m backend.jobs.worker
+    environment:
+      DATABASE_URL: postgresql://postgres:docuchat123@db:5432/docuchat
+      REDIS_URL: redis://redis:6379/0
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: docuchat-documents
+      MINIO_SECURE: "0"
+      STORAGE_BACKEND: auto
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-4o}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      UPLOAD_DIR: /app/backend/uploads
+      INDEX_DIR: /app/backend/faiss_indexes
+    volumes:
+      - uploads_data:/app/backend/uploads
+      - indexes_data:/app/backend/faiss_indexes
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
@@ -68,5 +159,7 @@ services:
 
 volumes:
   db_data:
+  redis_data:
+  minio_data:
   uploads_data:
   indexes_data:

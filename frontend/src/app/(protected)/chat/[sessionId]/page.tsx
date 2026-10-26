@@ -36,7 +36,7 @@ export default function ChatPage({
   const { sessionId } = use(params);
   const search = useSearchParams();
   const initialWorkflow = workflows.find(
-    (w) => w.id === search.get("workflow"),
+    (w) => w.id === search?.get("workflow"),
   );
   const [session, setSession] = useState<Awaited<
     ReturnType<typeof fetchSession>
@@ -172,7 +172,7 @@ export default function ChatPage({
       `# ${session?.title}\n\n` +
       messages
         .map(
-          (m) => `## ${m.role === "user" ? "You" : "DocuChat"}\n\n${m.content}`,
+          (m) => `## ${m.role === "user" ? "You" : "DOCTool"}\n\n${m.content}`,
         )
         .join("\n\n");
     const url = URL.createObjectURL(
@@ -180,7 +180,7 @@ export default function ChatPage({
     );
     const a = document.createElement("a");
     a.href = url;
-    a.download = "docuchat-conversation.md";
+    a.download = "doctool-conversation.md";
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -261,14 +261,27 @@ export default function ChatPage({
               in your document
             </div>
             <select
-              aria-label="Assistant mode"
-              disabled={streaming}
-              value={mode}
-              onChange={(e) => setMode(e.target.value as ChatMode)}
-              className="rounded-md border border-slate-200 bg-white p-1.5 text-[11px]"
-            >
+               aria-label="Assistant mode"
+               disabled={streaming}
+               value={mode}
+               onChange={(e) => setMode(e.target.value as ChatMode)}
+               className="rounded-md border border-slate-200 bg-white p-1.5 text-[11px]"
+             >
               <option value="conversational">Document chat</option>
               <option value="agent">Research agent</option>
+              <option value="summary">Summary agent</option>
+              <option value="research">Deep research</option>
+              <option value="extraction">Data extraction</option>
+              <option value="comparison">Comparison</option>
+              <option value="factcheck">Fact-check</option>
+              <option value="invoice">Invoice processing</option>
+              <option value="receipt">Receipt & Expenses</option>
+              <option value="contract">Contract analysis</option>
+              <option value="resume">Resume & Talent</option>
+              <option value="compliance">PII & Compliance</option>
+              <option value="form_parser">Form Parser</option>
+              <option value="google_ai">Google AI Document</option>
+              <option value="coordinator">Auto-routing</option>
             </select>
           </div>
           <div
@@ -319,12 +332,20 @@ export default function ChatPage({
           </div>
           <div className="border-t border-slate-100 p-4 sm:px-6">
             {error && (
-              <p
+              <div
                 role="alert"
-                className="mb-3 rounded-lg bg-rose-50 p-3 text-xs text-rose-700"
+                className="mb-3 flex items-center justify-between rounded-lg bg-rose-50 p-3 text-xs text-rose-700"
               >
-                {error}
-              </p>
+                <span>{error}</span>
+                {error.toLowerCase().includes("credit") && (
+                  <Link
+                    href="/usage"
+                    className="ml-3 shrink-0 rounded bg-rose-600 px-2.5 py-1 text-[11px] font-medium text-white hover:bg-rose-700 transition"
+                  >
+                    View API & Credits
+                  </Link>
+                )}
+              </div>
             )}
             <ChatInput
               key={draftKey}
@@ -336,13 +357,43 @@ export default function ChatPage({
             <div className="mt-2 flex items-center justify-between gap-2 text-[9px] text-slate-400">
               <span>
                 {streaming
-                  ? mode === "agent"
+                  ? mode === "agent" ||
+                    mode === "research" ||
+                    mode === "comparison" ||
+                    mode === "factcheck" ||
+                    mode === "coordinator"
                     ? "Agent is searching and reading your document…"
-                    : "Preparing your answer…"
+                    : mode === "extraction"
+                      ? "Agent is extracting data from your document…"
+                      : mode === "summary"
+                        ? "Agent is summarizing your document…"
+                        : mode === "invoice"
+                          ? "Agent is processing the invoice…"
+                          : mode === "contract"
+                            ? "Agent is analyzing the contract…"
+                            : "Preparing your answer…"
                   : "AI can make mistakes. Check important details against the source."}
               </span>
               <span className="hidden shrink-0 sm:block">
-                {mode === "agent" ? "Research agent" : "Document chat"}
+                {mode === "agent"
+                  ? "Research agent"
+                  : mode === "summary"
+                    ? "Summary agent"
+                    : mode === "research"
+                      ? "Deep research"
+                      : mode === "extraction"
+                        ? "Data extraction"
+                        : mode === "comparison"
+                          ? "Comparison"
+                          : mode === "factcheck"
+                            ? "Fact-check"
+                            : mode === "invoice"
+                              ? "Invoice processing"
+                              : mode === "contract"
+                                ? "Contract analysis"
+                                : mode === "coordinator"
+                                  ? "Auto-routing"
+                                  : "Document chat"}
               </span>
             </div>
           </div>
@@ -394,9 +445,18 @@ export default function ChatPage({
               </select>
               <p className="mt-4 flex items-center gap-2 text-[10px] leading-5 text-slate-400">
                 <Bot size={14} className="shrink-0" />
-                {mode === "agent"
-                  ? "Agent tools: search, read, and summarize."
-                  : "Switch to Research agent for deeper investigation."}
+                {mode === "agent" ||
+                mode === "research" ||
+                mode === "comparison" ||
+                mode === "factcheck"
+                  ? "Research tools: search, read pages, compare, verify."
+                  : mode === "summary"
+                    ? "Summary tools: search, read pages, summarize."
+                    : mode === "extraction"
+                      ? "Extraction tools: search, read, extract tables, calculate."
+                      : mode === "coordinator"
+                        ? "Coordinator: auto-routes to specialist agents."
+                        : "Switch to a research agent for deeper investigation."}
               </p>
             </section>
             <section className="surface flex min-h-[340px] flex-1 flex-col p-5">

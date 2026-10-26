@@ -174,8 +174,8 @@ class ConversationChain:
 # ---------------------------------------------------------------------------
 
 
-def get_llm(model_name: Optional[str] = None, temperature: Optional[float] = None) -> ChatOpenAI:
-    """Create a ChatOpenAI LLM instance.
+def get_llm(model_name: Optional[str] = None, temperature: Optional[float] = None) -> Any:
+    """Create an LLM instance (ChatOpenAI or ChatGoogleGenerativeAI).
 
     If *model_name* is None, reads ``DEFAULT_MODEL`` from the environment
     (falls back to ``gpt-6-luna``).
@@ -185,6 +185,21 @@ def get_llm(model_name: Optional[str] = None, temperature: Optional[float] = Non
     """
     if model_name is None:
         model_name = os.getenv("DEFAULT_MODEL", "gpt-6-luna")
+
+    lower_model = model_name.lower()
+    if lower_model.startswith("gemini") or "google" in lower_model:
+        try:
+            from langchain_google_genai import ChatGoogleGenerativeAI
+
+            api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+            kwargs: dict = {"model": model_name}
+            if api_key:
+                kwargs["google_api_key"] = api_key
+            if temperature is not None:
+                kwargs["temperature"] = temperature
+            return ChatGoogleGenerativeAI(**kwargs)
+        except Exception:
+            pass
 
     kwargs: dict = {"model": model_name}
     if temperature is not None:

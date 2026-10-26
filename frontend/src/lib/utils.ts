@@ -13,8 +13,11 @@ export function formatBytes(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(2))} ${sizes[i]}`;
 }
 
-export function formatDate(d: string | Date): string {
-  return new Date(d).toLocaleString("en-US", {
+export function formatDate(d: string | Date | null | undefined): string {
+  if (!d) return "Recently";
+  const date = new Date(d);
+  if (isNaN(date.getTime())) return "Recently";
+  return date.toLocaleString("en-US", {
     month: "short",
     day: "numeric",
     hour: "2-digit",

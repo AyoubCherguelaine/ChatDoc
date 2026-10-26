@@ -190,6 +190,24 @@ export function fetchCapabilities() {
     maxUploadMB: number;
   }>("/capabilities");
 }
+
+export function fetchAgentCapabilities() {
+  return api<{
+    modes: { value: string; name: string; description: string }[];
+  }>("/capabilities/agents");
+}
+
+export interface DocumentOutline {
+  documentId: string;
+  filename: string;
+  pageCount: number;
+  headings: { text: string; page: number; level: number; fontSize?: number; bold?: boolean }[];
+}
+
+export function fetchDocumentOutline(documentId: string) {
+  return api<DocumentOutline>(`/documents/${documentId}/outline`);
+}
+
 export function fetchPage(documentId: string, page: number) {
   return api<{
     page: number;
@@ -201,4 +219,203 @@ export function fetchPage(documentId: string, page: number) {
 
 export function fetchSessions() {
   return api<import("./types").ChatSession[]>("/sessions");
+}
+
+export function analyzeWithGoogleAI(
+  documentId: string,
+  options: { task?: "comprehensive" | "entities" | "layout" | "tables"; model?: string } = {}
+) {
+  return api<{
+    documentId: string;
+    filename: string;
+    task: string;
+    result: string;
+    success: boolean;
+    iterations: number;
+    steps: Array<{ thought?: string; action?: string; observation?: string }>;
+  }>(`/documents/${documentId}/google-ai`, {
+    method: "POST",
+    body: JSON.stringify({
+      task: options.task || "comprehensive",
+      model: options.model,
+    }),
+  });
+}
+
+export interface DocumentAIServiceResponse {
+  documentId: string;
+  filename: string;
+  service: string;
+  result: string;
+  success: boolean;
+  iterations: number;
+  steps: Array<{ thought?: string; action?: string; observation?: string }>;
+}
+
+export function analyzeReceipt(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/receipt`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function analyzeResume(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/resume`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function auditCompliance(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/compliance`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function parseFormFields(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/form-parser`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function redactSensitivePII(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/redaction`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function classifyDocument(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/classifier`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function analyzeFinancialStatement(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/financial-statement`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function translateDocument(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/translation`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function auditAnomalies(documentId: string, options: { model?: string } = {}) {
+  return api<DocumentAIServiceResponse>(`/documents/${documentId}/anomaly-audit`, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+export function runDocumentService(
+  documentId: string,
+  serviceKey: string,
+  options: { model?: string } = {},
+) {
+  const serviceEndpoints: Record<string, string> = {
+    receipt: `/documents/${documentId}/receipt`,
+    resume: `/documents/${documentId}/resume`,
+    compliance: `/documents/${documentId}/compliance`,
+    form_parser: `/documents/${documentId}/form-parser`,
+    comparison: `/documents/${documentId}/comparison`,
+    factcheck: `/documents/${documentId}/factcheck`,
+    invoice: `/documents/${documentId}/invoice`,
+    contract: `/documents/${documentId}/contract`,
+    google_ai: `/documents/${documentId}/google-ai`,
+    redaction: `/documents/${documentId}/redaction`,
+    classifier: `/documents/${documentId}/classifier`,
+    financial_statement: `/documents/${documentId}/financial-statement`,
+    translation: `/documents/${documentId}/translation`,
+    anomaly_audit: `/documents/${documentId}/anomaly-audit`,
+  };
+  const endpoint = serviceEndpoints[serviceKey] || `/documents/${documentId}/workflow`;
+  return api<DocumentAIServiceResponse>(endpoint, {
+    method: "POST",
+    body: JSON.stringify({ model: options.model }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Company Billing, API Keys, and Enterprise Quota
+// ---------------------------------------------------------------------------
+
+export interface CompanyAccountInfo {
+  id: string;
+  companyName: string;
+  planTier: string;
+  isFreeTrialOnly: boolean;
+  totalCredits: number;
+  usedCredits: number;
+  remainingCredits: number;
+  apiKeyPrefix: string;
+  apiKey: string;
+  rawApiKey?: string;
+  createdAt: string;
+}
+
+export type CompanyAccount = CompanyAccountInfo;
+
+export interface ServicePricingItem {
+  id: string;
+  name: string;
+  credits: number;
+  llmTier: string;
+  category: string;
+  description: string;
+}
+
+export interface PricingCatalogResponse {
+  plan: string;
+  initialCredits: number;
+  freeTrialAvailableOnly: boolean;
+  services: ServicePricingItem[];
+}
+
+export interface ApiUsageLogItem {
+  id: string;
+  serviceName: string;
+  creditsCost: number;
+  documentId: string | null;
+  requestSummary: string | null;
+  status: string;
+  createdAt: string;
+}
+
+export interface CompanyUsageResponse {
+  companyId: string;
+  totalCredits: number;
+  usedCredits: number;
+  remainingCredits: number;
+  logs: ApiUsageLogItem[];
+}
+
+export function fetchCompanyAccount() {
+  return api<CompanyAccountInfo>("/company/account");
+}
+
+export function regenerateCompanyApiKey() {
+  return api<{
+    apiKey: string;
+    apiKeyPrefix: string;
+    remainingCredits: number;
+    planTier: string;
+  }>("/company/api-key/regenerate", {
+    method: "POST",
+  });
+}
+
+export function fetchCompanyPricing() {
+  return api<PricingCatalogResponse>("/company/pricing");
+}
+
+export function fetchCompanyUsage() {
+  return api<CompanyUsageResponse>("/company/usage");
 }

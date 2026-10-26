@@ -41,4 +41,24 @@ export interface AuthResponse {
   user: User;
 }
 
-export type ChatMode = "conversational" | "agent";
+export type ChatMode =
+  | "conversational"
+  | "agent"
+  | "summary"
+  | "research"
+  | "extraction"
+  | "comparison"
+  | "factcheck"
+  | "invoice"
+  | "contract"
+  | "google_ai"
+  | "receipt"
+  | "resume"
+  | "compliance"
+  | "form_parser"
+  | "coordinator"
+  | "redaction"
+  | "classifier"
+  | "financial_statement"
+  | "translation"
+  | "anomaly_audit";

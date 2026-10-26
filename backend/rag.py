@@ -26,7 +26,27 @@ from langchain_core.documents import Document
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from backend.agent.agent import AgentConfig, FreeAgent
+from backend.agent.agents.anomaly_audit import AnomalyAuditAgent
+from backend.agent.agents.base import BaseAgent, BaseAgentConfig
+from backend.agent.agents.classifier import ClassifierAgent
+from backend.agent.agents.comparison import ComparisonAgent
+from backend.agent.agents.compliance import ComplianceAgent
+from backend.agent.agents.contract import ContractAgent
+from backend.agent.agents.coordinator import CoordinatorAgent
+from backend.agent.agents.extraction import ExtractionAgent
+from backend.agent.agents.factcheck import FactCheckAgent
+from backend.agent.agents.financial_statement import FinancialStatementAgent
+from backend.agent.agents.form_parser import FormParserAgent
+from backend.agent.agents.google_ai import GoogleAIDocumentAgent
+from backend.agent.agents.invoice import InvoiceAgent
+from backend.agent.agents.receipt import ReceiptAgent
+from backend.agent.agents.redaction import RedactionAgent
+from backend.agent.agents.research import ResearchAgent
+from backend.agent.agents.resume import ResumeAgent
+from backend.agent.agents.summary import SummaryAgent
+from backend.agent.agents.translation import TranslationAgent
 from backend.agent.tools.document_tools import DocumentToolKit
+from backend.agent.tools.enhanced import EnhancedDocumentKit
 from backend.chat.chatWithVSDB import get_conversation_chain, get_llm
 from backend.documents.loader import load_document
 from backend.documents.processors import DocumentProcessor, ProcessingConfig
@@ -95,10 +115,24 @@ def _pdf_path(doc_id: str) -> Path:
     return Path(settings.UPLOAD_DIR) / doc_id / row["filename"]
 
 
-def process_upload(user_id: str, file_path: Path, original_filename: str, file_size: int, mime: str) -> tuple[int, int]:
+class UploadResult(tuple):
+    """Backwards-compatible tuple (chunk_count, page_count) that also holds document_id."""
+    chunk_count: int
+    page_count: int
+    document_id: str
+
+    def __new__(cls, chunk_count: int, page_count: int, document_id: str):
+        instance = super().__new__(cls, (chunk_count, page_count))
+        instance.chunk_count = chunk_count
+        instance.page_count = page_count
+        instance.document_id = document_id
+        return instance
+
+
+def process_upload(user_id: str, file_path: Path, original_filename: str, file_size: int, mime: str) -> UploadResult:
     """Process an uploaded document: chunk, embed-index, persist chunks.
 
-    Returns (chunk_count, page_count).
+    Returns UploadResult(chunk_count, page_count, document_id).
     """
     _ensure_dirs()
     doc_id = str(uuid.uuid4())
@@ -112,6 +146,11 @@ def process_upload(user_id: str, file_path: Path, original_filename: str, file_s
     dest = doc_dir / original_filename
     try:
         shutil.copyfile(file_path, dest)
+        try:
+            from backend.storage import storage_service
+            storage_service.upload(f"documents/{doc_id}/{original_filename}", file_path)
+        except Exception:
+            pass
         try:
             pdf_doc = load_document(dest)
         except ValueError:
@@ -163,7 +202,7 @@ def process_upload(user_id: str, file_path: Path, original_filename: str, file_s
         bundle.pdf_docs = [pdf_doc]
         _registry[doc_id] = bundle
 
-    return len(chunks), page_count
+    return UploadResult(len(chunks), page_count, doc_id)
 
 
 def get_bundle(doc_id: str) -> IndexBundle:
@@ -177,6 +216,29 @@ def get_bundle(doc_id: str) -> IndexBundle:
         bundle.ensure_loaded()
         _registry[doc_id] = bundle
         return bundle
+
+
+def get_page_text(doc_id: str, page: int) -> Optional[str]:
+    """Reconstruct page text from DB chunks when the PDF file is missing."""
+    rows = query(
+        "SELECT text, metadata FROM docuchat.chunks WHERE document_id = %s ORDER BY chunk_index",
+        (doc_id,),
+    )
+    if not rows:
+        return None
+    page_texts: list[str] = []
+    for r in rows:
+        meta = r["metadata"] or {}
+        start_page = meta.get("start_page")
+        end_page = meta.get("end_page")
+        if start_page is not None and end_page is not None:
+            if start_page <= page <= end_page:
+                page_texts.append(r["text"])
+        elif r.get("page_index") == page:
+            page_texts.append(r["text"])
+    if not page_texts:
+        return None
+    return "\n\n".join(page_texts)
 
 
 def get_history(session_id: str) -> list:
@@ -210,7 +272,16 @@ def stream_chat(
 ):
     """Yield streamed text chunks for a user turn.
 
-    ``mode`` is ``"conversational"`` (retrieval+LLM) or ``"agent"`` (ReAct).
+    Supported ``mode`` values:
+
+    * ``"conversational"`` — retrieval + LLM (classic Q&A)
+    * ``"agent"`` — free ReAct agent (general research)
+    * ``"summary"`` — executive summary agent
+    * ``"research"`` — research agent (evidence gathering + verification)
+    * ``"extraction"`` — data extraction agent (tables, metrics)
+    * ``"comparison"`` — multi-document comparison agent
+    * ``"factcheck"`` — claim verification agent
+    * ``"coordinator"`` — routes to the best specialist agent
     """
     bundle = get_bundle(doc_id)
     if bundle.vector_store is None:
@@ -223,8 +294,14 @@ def stream_chat(
         "detailed": "Provide a thorough analysis with headings and specific evidence.",
     }.get(response_style, "")
     query = query + "\n\nResponse preference: " + instruction
-    if mode == "agent":
-        yield from _stream_agent(bundle, query, history, model_name)
+
+    agent_modes = {
+        "agent", "summary", "research", "extraction",
+        "comparison", "factcheck", "coordinator", "invoice", "contract", "google_ai",
+        "receipt", "resume", "compliance", "form_parser",
+    }
+    if mode in agent_modes:
+        yield from _stream_agent(bundle, query, history, model_name, mode)
     else:
         yield from _stream_conversational(bundle, query, history, model_name)
 
@@ -261,21 +338,190 @@ def _stream_conversational(bundle: IndexBundle, query: str, history: list, model
             raise
 
 
-def _stream_agent(bundle: IndexBundle, query: str, history: list, model_name: str):
+def _build_toolkit(bundle: IndexBundle, model_name: str, enhanced: bool = False):
+    """Build a DocumentToolKit (or EnhancedDocumentKit) for agent use."""
     llm = get_llm(model_name=model_name)
-    toolkit = DocumentToolKit(
+    kit_cls = EnhancedDocumentKit if enhanced else DocumentToolKit
+    return kit_cls(
         vector_store=bundle.vector_store,
         documents=bundle.pdf_docs,
         llm=llm,
     )
-    agent = FreeAgent(
-        llm=llm,
-        tool_kit=toolkit,
-        config=AgentConfig(max_iterations=8, verbose=False),
-    )
+
+
+def _build_agent(bundle: IndexBundle, model_name: str, mode: str) -> BaseAgent:
+    """Factory: build the appropriate agent for the requested mode."""
+    use_enhanced = mode in {
+        "extraction", "factcheck", "coordinator", "invoice", "contract", "google_ai",
+        "receipt", "resume", "compliance", "form_parser",
+        "redaction", "classifier", "financial_statement", "translation", "anomaly_audit",
+    }
+    toolkit = _build_toolkit(bundle, model_name, enhanced=use_enhanced)
+
+    if mode == "summary":
+        agent: BaseAgent = SummaryAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=8, verbose=False),
+        )
+    elif mode == "research":
+        agent = ResearchAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "extraction":
+        agent = ExtractionAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=8, verbose=False),
+        )
+    elif mode == "comparison":
+        agent = ComparisonAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=8, verbose=False),
+        )
+    elif mode == "factcheck":
+        agent = FactCheckAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=6, verbose=False),
+        )
+    elif mode == "invoice":
+        agent = InvoiceAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "contract":
+        agent = ContractAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=12, verbose=False),
+        )
+    elif mode == "google_ai":
+        agent = GoogleAIDocumentAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "receipt":
+        agent = ReceiptAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "resume":
+        agent = ResumeAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "compliance":
+        agent = ComplianceAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "form_parser":
+        agent = FormParserAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "redaction":
+        agent = RedactionAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "classifier":
+        agent = ClassifierAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=8, verbose=False),
+        )
+    elif mode == "financial_statement":
+        agent = FinancialStatementAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "translation":
+        agent = TranslationAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "anomaly_audit":
+        agent = AnomalyAuditAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=10, verbose=False),
+        )
+    elif mode == "coordinator":
+        coordinator = CoordinatorAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=BaseAgentConfig(max_iterations=8, verbose=False),
+        )
+        # Register sub-agents
+        for sub_name, sub_cls in [
+            ("summary", SummaryAgent),
+            ("research", ResearchAgent),
+            ("extraction", ExtractionAgent),
+            ("comparison", ComparisonAgent),
+            ("factcheck", FactCheckAgent),
+            ("invoice", InvoiceAgent),
+            ("contract", ContractAgent),
+            ("google_ai", GoogleAIDocumentAgent),
+            ("receipt", ReceiptAgent),
+            ("resume", ResumeAgent),
+            ("compliance", ComplianceAgent),
+            ("form_parser", FormParserAgent),
+            ("redaction", RedactionAgent),
+            ("classifier", ClassifierAgent),
+            ("financial_statement", FinancialStatementAgent),
+            ("translation", TranslationAgent),
+            ("anomaly_audit", AnomalyAuditAgent),
+            ("chat", FreeAgent),
+        ]:
+            sub = sub_cls(
+                llm=get_llm(model_name=model_name),
+                tool_kit=toolkit,
+                config=BaseAgentConfig(max_iterations=8, verbose=False),
+            )
+            coordinator.register_sub_agent(sub_name, sub)
+        agent = coordinator
+    else:
+        # Default: FreeAgent (general-purpose ReAct)
+        agent = FreeAgent(
+            llm=toolkit.llm,
+            tool_kit=toolkit,
+            config=AgentConfig(max_iterations=8, verbose=False),
+        )
+
+    return agent
+
+
+def _stream_agent(
+    bundle: IndexBundle,
+    query: str,
+    history: list,
+    model_name: str,
+    mode: str = "agent",
+):
+    agent = _build_agent(bundle, model_name, mode)
+
     recent = "\n".join(f"{m.type}: {m.content}" for m in history[-10:])
-    result = agent.run("Conversation context (for reference only):\n" + recent + "\n\nCurrent request:\n" + query)
+    full_query = (
+        "Conversation context (for reference only):\n"
+        + recent
+        + "\n\nCurrent request:\n"
+        + query
+    )
+    result = agent.run(full_query)
     text = result.response or ""
-    # Stream the final answer in small pieces for a fluid UI.
     for i in range(0, len(text), 60):
         yield text[i : i + 60]

@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DocuChat — Your documents. A world of answers.",
+  title: "DOCTool — Your documents. A world of answers.",
   description:
     "A knowledge workspace for PDF, Word, and Excel. Ask questions, research with document agents, and turn your files into insights.",
 };

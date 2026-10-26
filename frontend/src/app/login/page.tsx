@@ -18,7 +18,7 @@ function LoginForm() {
   const router = useRouter();
   const { user, login, register } = useSession();
   const [mode, setMode] = useState<"login" | "signup">(
-    search.get("mode") === "signup" ? "signup" : "login",
+    search?.get("mode") === "signup" ? "signup" : "login",
   );
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");

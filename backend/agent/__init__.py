@@ -1,5 +1,6 @@
 """
-Agent package — free autonomous agent with document tools and ReAct loops.
+Agent package — free autonomous agent with document tools and ReAct loops,
+plus a specialised multi-agent system.
 
 Submodules
 ----------
@@ -7,8 +8,22 @@ agent.py
     The :class:`FreeAgent` core: a ReAct-style loop that can call tools
     iteratively until it can answer the user's question.
 
+agents/
+    Specialised agent implementations:
+
+    * :class:`~backend.agent.agents.base.BaseAgent` — abstract ReAct base
+    * :class:`~backend.agent.agents.summary.SummaryAgent` — executive summaries
+    * :class:`~backend.agent.agents.research.ResearchAgent` — deep research
+    * :class:`~backend.agent.agents.extraction.ExtractionAgent` — data extraction
+    * :class:`~backend.agent.agents.comparison.ComparisonAgent` — document comparison
+    * :class:`~backend.agent.agents.factcheck.FactCheckAgent` — claim verification
+    * :class:`~backend.agent.agents.coordinator.CoordinatorAgent` — routing
+
 tools.document_tools
     Concrete tools for reading pages, searching, summarising, etc.
+
+tools.enhanced
+    Extended tools: extract_table, verify_fact, calculate, get_outline.
 
 tools.registry
     Base :class:`Tool` dataclass and :class:`ToolRegistry` container.

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "docuchat": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "backend.mcp.server"
+      ],
+      "env": {
+        "DOCUCHAT_API_KEY": "YOUR_COMPANY_API_KEY_HERE",
+        "DOCUCHAT_BASE_URL": "http://127.0.0.1:8000"
+      }
+    }
+  }
+}
+

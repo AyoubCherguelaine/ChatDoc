@@ -41,7 +41,7 @@ export function MessageBubble({
         }
       >
         {assistant && (
-          <p className="mb-3 text-xs font-semibold text-[#41645c]">DocuChat</p>
+          <p className="mb-3 text-xs font-semibold text-[#41645c]">DOCTool</p>
         )}
         <div
           className={`text-sm leading-7 ${assistant ? "markdown-content text-slate-600" : "whitespace-pre-wrap break-words text-slate-700"}`}

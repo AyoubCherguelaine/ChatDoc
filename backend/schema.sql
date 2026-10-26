@@ -64,3 +64,34 @@ CREATE INDEX IF NOT EXISTS idx_msgs_session   ON docuchat.messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_doc   ON docuchat.sessions(document_id);
 CREATE INDEX IF NOT EXISTS idx_sessions_user  ON docuchat.sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_docs_user      ON docuchat.documents(user_id);
+
+-- Company Accounts (Free trial only, 1,200 initial credits, API key)
+CREATE TABLE IF NOT EXISTS docuchat.company_accounts (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID NOT NULL UNIQUE REFERENCES docuchat.users(id) ON DELETE CASCADE,
+    company_name   TEXT NOT NULL DEFAULT 'Enterprise Free Trial',
+    plan_tier      TEXT NOT NULL DEFAULT 'free_trial',
+    total_credits  INT NOT NULL DEFAULT 1200,
+    used_credits   INT NOT NULL DEFAULT 0,
+    api_key        TEXT UNIQUE NOT NULL,
+    api_key_prefix TEXT NOT NULL,
+    is_active      BOOLEAN NOT NULL DEFAULT true,
+    created_at     TIMESTAMPTZ DEFAULT now(),
+    updated_at     TIMESTAMPTZ DEFAULT now()
+);
+
+-- Company API Usage & Audit Logs
+CREATE TABLE IF NOT EXISTS docuchat.api_usage_logs (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id      UUID NOT NULL REFERENCES docuchat.company_accounts(id) ON DELETE CASCADE,
+    service_name    TEXT NOT NULL,
+    credits_cost    INT NOT NULL,
+    document_id     TEXT,
+    request_summary TEXT,
+    status          TEXT NOT NULL DEFAULT 'success',
+    created_at      TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_company_user   ON docuchat.company_accounts(user_id);
+CREATE INDEX IF NOT EXISTS idx_company_apikey ON docuchat.company_accounts(api_key);
+CREATE INDEX IF NOT EXISTS idx_usage_company  ON docuchat.api_usage_logs(company_id);

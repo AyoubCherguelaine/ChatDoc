@@ -30,7 +30,21 @@ class Settings:
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "backend/uploads")
     INDEX_DIR: str = os.getenv("INDEX_DIR", "backend/faiss_indexes")
 
-    JWT_SECRET: str = os.getenv("JWT_SECRET", "change-me-in-production")
+    # Redis Distributed Cache & Queue
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+
+    # MinIO S3-Compatible Object Storage
+    MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+    MINIO_BUCKET: str = os.getenv("MINIO_BUCKET", "docuchat-documents")
+    MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "0") == "1"
+    STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "auto")  # minio, local, auto
+
+    JWT_SECRET: str = os.getenv(
+        "JWT_SECRET",
+        "docuchat-production-secret-key-32bytes-minimum-security-token-2026",
+    )
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_MINUTES: int = int(os.getenv("JWT_EXPIRE_MINUTES", "10080"))
 

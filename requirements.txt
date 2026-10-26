@@ -6,6 +6,14 @@ python-dotenv>=1.0.0
 psycopg2-binary>=2.9
 bcrypt>=4.1
 PyJWT>=2.8
+httpx>=0.27.0
+
+# Model Context Protocol (MCP) for Claude Desktop, Claude Code, GPT chats
+mcp>=2.0.0
+
+# Production Infrastructure: Distributed Caching, Task Queues & Object Storage
+redis>=5.0.0
+minio>=7.2.0
 
 # PDF processing — PyMuPDF for perfect text quality + page-level access
 pymupdf>=1.24.0

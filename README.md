@@ -23,8 +23,11 @@ docker compose up --build
 | Service | URL | Notes |
 | --- | --- | --- |
 | Frontend | http://localhost:3000 | Next.js production server (Docker) |
-| Backend API | http://localhost:8000/api | `/api/docs` for the OpenAPI UI, `/api/health` to check liveness |
+| Backend API | http://localhost:8000/api | `/api/docs` for OpenAPI UI, `/api/health` for production probes |
 | PostgreSQL (pgvector) | localhost:5436 | db `docuchat`, user `postgres`, password `docuchat123` |
+| Redis (Queue & Cache) | localhost:6379 | Distributed task queue, rate limiting & token bucket |
+| MinIO (Object Storage) | http://localhost:9000 | S3-compatible document storage (bucket `docuchat-documents`) |
+| MinIO Web Console | http://localhost:9001 | Web GUI (User: `minioadmin`, Pass: `minioadmin`) |
 
 > The database schema (`backend/schema.sql`) is created automatically on first `docker compose up` (the data volume is empty). Subsequent starts reuse the persisted `db_data` volume; to reset, run `docker compose down -v`.
 
@@ -35,12 +38,15 @@ docker compose up --build
 3. [Project Structure](#project-structure)
 4. [Installation](#installation)
 5. [Configuration](#configuration)
-6. [Usage](#usage)
-7. [Agent Mode Explained](#agent-mode-explained)
-8. [Hybrid RAG Explained](#hybrid-rag-explained)
-9. [API Reference](#api-reference)
-10. [Development](#development)
-11. [License](#license)
+ 6. [Usage](#usage)
+ 7. [Agent Mode Explained](#agent-mode-explained)
+ 8. [Agent Modes](#agent-modes)
+10. [Agent Modes](#agent-modes)
+11. [Multi-Service Dashboard](#multi-service-dashboard)
+12. [Hybrid RAG Explained](#hybrid-rag-explained)
+13. [API Reference](#api-reference)
+14. [Development](#development)
+15. [License](#license)
 
 ---
 
@@ -48,8 +54,14 @@ docker compose up --build
 
 | Feature | Description |
 |---|---|
+| **Multiple Specialized Agents** | Choose between `summary`, `research`, `extraction`, `comparison`, `factcheck`, `invoice`, `contract`, `google_ai`, `receipt`, `resume`, `compliance`, `form_parser`, `coordinator` modes, plus the classic `FreeAgent` |
+| **Multi-Service Dashboard** | Dedicated `/services` page with enterprise Document AI service cards, category filters, and search |
+| **Invoice & Receipt Processing** | Extract structured invoice and expense data (merchants, line items, totals, taxes, tips) as verified JSON |
+| **Contract Analysis & Compliance** | Extract contract clauses/obligations, flag risks, and run automated PII/GDPR/HIPAA compliance audits |
+| **Talent & Form Intelligence** | Screen resumes/CVs for skills and seniority; parse form key-values, checkboxes, and signatures |
 | **Free Agent** | Autonomous ReAct-style agent that uses tools iteratively — search, read pages, summarize, compare — until it has a confident answer |
 | **Page-Level Reading** | PyMuPDF-powered tools to read specific pages or page ranges ("special pages") |
+| **Document Structure Extraction** | Extract document outlines (headings/bookmarks) and tables from PDFs |
 | **Cheap OpenAI Embeddings** | `text-embedding-3-small` — the cheapest high-quality OpenAI embedding model |
 | **Hybrid RAG (text + embedding)** | Combines BM25 keyword search + dense embeddings via Reciprocal Rank Fusion (RRF) |
 | **Large Chunks** | 4 000-character chunks with 500-char overlap and semantic boundary detection |
@@ -75,7 +87,7 @@ User Query
 │           Next.js Frontend (frontend/)             │
 │           + FastAPI Backend (backend/)       │
 │                                              │
-│   Mode: [Agent (Free)] [Conversational]       │
+│   Mode: [Summary Research Extract Compare Factcheck Coordinator] │
 │   Backend: [OpenAI GPT]  Embedding: [text-   │
 │   embedding-3-small]  Hybrid: [ON]            │
 │   Auth: [Email + password]  DB: [PostgreSQL] │
@@ -83,8 +95,11 @@ User Query
     │                    │
     ▼                    ▼
 ┌──────────────┐    ┌──────────────────────┐
-│ FreeAgent    │    │ ConversationChain    │
-│ (ReAct Loop) │    │ (gpt-6-luna)        │
+│  Multiple    │    │ ConversationChain    │
+│  Specialized │    │ (gpt-6-luna)        │
+│  Agents +    │    │                      │
+│  FreeAgent   │    │                      │
+│ (ReAct Loop) │    │                      │
 └──────┬───────┘    └────────┬─────────────┘
        │                     │
        ▼                     ▼
@@ -379,10 +394,12 @@ npm run dev      # -> http://localhost:3000
    text persisted in PostgreSQL).
 3. Click **"Chat"** on a document → choose **"New conversation"** or pick an
    existing session (sessions are recalled from PostgreSQL).
-4. Ask a question. Responses **stream** token-by-token. Switch the mode toggle:
-   - **Conversational** — classic retrieval chain.
-   - **Agent** — the free ReAct agent that searches, reads specific pages, and
-     cross-references before answering.
+   4. Ask a question. Responses **stream** token-by-token. Switch the mode toggle:
+      - **Conversational** — classic retrieval chain.
+      - **Agent** — the free ReAct agent that searches, reads specific pages, and
+        cross-references before answering.
+      - **Summary** / **Research** / **Extraction** / **Comparison** / **Fact Check** /
+        **Coordinator** — specialized agents for specific tasks.
 
 Sessions, messages and documents are stored in PostgreSQL, so your history
 survives restarts.
@@ -401,6 +418,9 @@ survives restarts.
 | `GET`  | `/api/sessions/{id}` | Load a session + message history |
 | `DELETE` | `/api/sessions/{id}` | Delete a session |
 | `POST` | `/api/sessions/{id}/chat` | Streaming chat (SSE, JSON body `{message, mode}`) |
+| `GET`  | `/api/documents/{doc_id}/outline` | Document structural outline (headings) |
+| `GET`  | `/api/capabilities/agents` | List available agent modes and their capabilities |
+| `POST` | `/api/documents/{doc_id}/workflow` | Execute a named workflow (summary, research, comparison, etc.) |
 
 > All routes except `/api/health` require `Authorization: Bearer <accessToken>`.
 
@@ -511,6 +531,29 @@ The **FreeAgent** implements a ReAct loop. Each iteration:
 | `compare_documents` | Search across all documents | `query`, `top_k_per_doc` |
 | `get_metadata` | Get chunk/page metadata | `doc_name`, `page_num` |
 
+## Agent Modes
+
+The system supports multiple specialized agent modes. Each mode uses a different
+agent class with tailored system prompts and tool configurations.
+
+| Mode | Agent | Description |
+|---|---|---|
+| `conversational` | *(none)* | Classic Q&A with conversational memory (no agent loop) |
+| `agent` | `FreeAgent` | General-purpose ReAct agent with full tool access |
+| `summary` | `SummaryAgent` | Generate an executive summary of the documents |
+| `research` | `ResearchAgent` | Deep research — gather evidence and cite sources |
+| `extraction` | `ExtractionAgent` | Extract structured data, tables, and specific facts |
+| `comparison` | `ComparisonAgent` | Compare and contrast across multiple documents |
+| `factcheck` | `FactCheckAgent` | Verify claims against document content |
+| `invoice` | `InvoiceAgent` | Extract structured invoice data as JSON |
+| `contract` | `ContractAgent` | Analyze contracts — clauses, risks, obligations |
+| `google_ai` | `GoogleAIDocumentAgent` | Multimodal document intelligence, layout parsing, and entity extraction |
+| `receipt` | `ReceiptAgent` | Itemized receipts, taxes, tips, payment methods, and financial verification |
+| `resume` | `ResumeAgent` | Candidate profiling, skills taxonomy, work history, and seniority assessment |
+| `compliance` | `ComplianceAgent` | PII detection, sensitive credential leaks, and GDPR/HIPAA risk scoring |
+| `form_parser` | `FormParserAgent` | Form fields, key-value mappings, checkbox states, and signature blocks |
+| `coordinator` | `CoordinatorAgent` | Route questions to the most appropriate sub-agent |
+
 ### Agent Trace Example
 
 ```
@@ -579,6 +622,73 @@ The system uses **three complementary retrieval strategies** fused together:
 
 ---
 
+## Multi-Service Dashboard
+
+The `/services` page provides a dashboard of document-processing services.
+Each service is a specialized agent preset that processes documents in a
+purpose-built way:
+
+| Service | Mode | Output |
+|---|---|---|
+| **Document Chat** | `conversational` | Conversational Q&A |
+| **Invoice Processing** | `invoice` | Structured invoice JSON (line items, totals, taxes) |
+| **Receipt & Expenses** | `receipt` | Itemized receipts, tips, taxes, and expense categories |
+| **Contract Analysis** | `contract` | Clause extraction, risk flags, key dates |
+| **PII & Compliance Audit** | `compliance` | Privacy risk score (0-100), PII enumeration, and redaction preview |
+| **Resume & Talent** | `resume` | Skills matrix, work history, and seniority assessment |
+| **Intelligent Form Parser** | `form_parser` | Form fields, checkboxes [X], and signature states |
+| **Executive Summary** | `summary` | Markdown executive summary |
+| **Deep Research** | `research` | Evidence-based research brief with citations |
+| **Data Extraction** | `extraction` | Markdown tables of key metrics and figures |
+| **Google AI Document** | `google_ai` | Multimodal document intelligence, layout parsing, and entity extraction |
+
+To use a service: open `/services`, choose a source document, and click
+the service card. The chat interface loads with the corresponding mode pre-selected.
+
+---
+
+## Company API Usage & Credit Billing
+
+Every company account receives **1,200 free trial credits** upon creation (free trial tier available only, zero credit card required).
+Each Document AI service is priced dynamically according to the underlying LLM token, vision, and reasoning compute intensity.
+
+### Service Credit Pricing
+
+| Document AI Service | API Route | LLM Compute Tier | Cost (Credits) | Free Trial Capacity |
+|---|---|---|---|---|
+| **Document Chat** | `/api/v1/services/chat` | Light | 5 credits | ~240 calls |
+| **Executive Summary** | `/api/v1/services/summary` | Light-Moderate | 10 credits | ~120 calls |
+| **Data Extraction** | `/api/v1/services/extraction` | Moderate | 15 credits | ~80 calls |
+| **Intelligent Form Parser** | `/api/v1/services/form_parser` | Moderate | 20 credits | ~60 calls |
+| **Receipt & Expenses** | `/api/v1/services/receipt` | Moderate | 20 credits | ~60 calls |
+| **Invoice Processing** | `/api/v1/services/invoice` | Moderate-Heavy | 25 credits | ~48 calls |
+| **Resume & Talent** | `/api/v1/services/resume` | Moderate-Heavy | 25 credits | ~48 calls |
+| **PII & Compliance Audit** | `/api/v1/services/compliance` | Heavy | 30 credits | ~40 calls |
+| **Contract Analysis** | `/api/v1/services/contract` | Heavy | 35 credits | ~34 calls |
+| **Google AI Multimodal** | `/api/v1/services/google_ai` | Multimodal Heavy | 40 credits | ~30 calls |
+| **Auto-Routing Coordinator** | `/api/v1/services/coordinator` | Multi-Agent | 45 credits | ~26 calls |
+| **Deep Research** | `/api/v1/services/research` | Multi-Step ReAct | 50 credits | ~24 calls |
+
+### Authenticating Company API Calls
+
+Pass your live key in either the `X-API-Key` or `Authorization` header:
+
+```bash
+curl -X POST "http://localhost:8000/api/v1/services/invoice" \
+  -H "X-API-Key: docu_live_your_company_key_here" \
+  -H "Content-Type: application/json" \
+  -d '{"document_id": "YOUR_DOCUMENT_UUID"}'
+```
+
+Every response returns headers:
+* `X-Credits-Cost: 25`
+* `X-Credits-Remaining: 1175`
+* `X-Trial-Plan: free_trial`
+
+If credits are exhausted, the endpoint returns `402 Payment Required`. Manage keys, inspect live quotas, and review consumption history at `/usage`.
+
+---
+
 ## API Reference
 
 ### `documents/`
@@ -588,6 +698,7 @@ The system uses **three complementary retrieval strategies** fused together:
 | `pdf_loader` | `load_pdf()`, `load_pdfs()`, `extract_page_text()`, `PDFDocument`, `PageText` |
 | `splitter` | `LargeChunkSplitter`, `SemanticChunkSplitter`, `split_documents()` |
 | `processors` | `DocumentProcessor`, `ProcessingConfig` |
+| `structure` | `extract_outline()`, `extract_tables()`, `Heading`, `TableExtract` |
 
 ### `embeddings/`
 
@@ -608,8 +719,19 @@ The system uses **three complementary retrieval strategies** fused together:
 | Module | Key Classes/Functions |
 |---|---|
 | `agent` | `FreeAgent`, `AgentConfig`, `AgentResult` |
+| `agents.base` | `BaseAgent`, `BaseAgentConfig`, `AgentResult` |
+| `agents.summary` | `SummaryAgent` — executive summaries |
+| `agents.research` | `ResearchAgent` — deep research with evidence gathering |
+| `agents.extraction` | `ExtractionAgent` — structured data extraction |
+| `agents.comparison` | `ComparisonAgent` — multi-document comparison |
+| `agents.factcheck` | `FactCheckAgent` — claim verification |
+| `agents.invoice` | `InvoiceAgent` — invoice data extraction as JSON |
+| `agents.contract` | `ContractAgent` — contract analysis and risk flagging |
+| `agents.coordinator` | `CoordinatorAgent` — routes questions to sub-agents |
 | `tools.registry` | `Tool`, `ToolRegistry` |
 | `tools.document_tools` | `DocumentToolKit` (7 tools) |
+| `tools.enhanced` | `EnhancedDocumentKit` — extract_table, verify_fact, calculate, get_outline, extract_invoice_data, extract_contract_data, ocr_read_page, ocr_extract_invoice, ocr_extract_contract |
+| `tools.ocr` | `OcrService`, `PdfRenderer` — vision-based OCR from scanned PDFs |
 | `prompts` | `SYSTEM_PROMPT`, `REACT_PROMPT`, `parse_agent_output()` |
 
 ---
@@ -720,3 +842,188 @@ npm run build
 ```
 
 Loader regression tests cover Word paragraph/table order, worksheet names and row numbering, formulas and zero values, CSV quoting, Unicode text, PDF routing, and empty/unsupported files. API tests cover model/mode validation, source ownership, scoped conversation listing, upload limits, message-history ordering, streamed answer persistence, and cleanup after a failed parse.
+
+---
+
+## B2B SaaS Pipeline Integration & Model Context Protocol (MCP)
+
+DocuChat provides an enterprise-ready B2B platform with dedicated developer APIs, background webhook automation, a Python SDK, and full Anthropic **Model Context Protocol (MCP)** support for **Claude Code**, **Claude Desktop / Claude Chat**, and **GPT Chats**.
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                        AI CLIENTS & PIPELINES                          │
+│                                                                        │
+│   Claude Code CLI    Claude Desktop      ChatGPT / GPT-4o    Airflow   │
+│   (stdio transport)   (stdio / SSE)       (OpenAPI / Tools)  (Python)  │
+└──────────┬──────────────────┬────────────────────┬───────────────┬─────┘
+           │                  │                    │               │
+           ▼                  ▼                    ▼               ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        DOCUCHAT B2B BACKEND                            │
+│                                                                        │
+│  • Model Context Protocol (MCP 2.x Server)  [/mcp/sse, stdio]          │
+│  • B2B REST Pipeline API v1                [/api/v1/pipeline/run]      │
+│  • ChatGPT Custom GPT Actions Schema       [/api/v1/gpt/openapi.json]  │
+│  • OpenAI Function Calling Catalog         [/api/v1/openai/tools]      │
+│  • Atomic Credit Billing & Usage Logs      [1,200 Trial Credits]       │
+└────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 1. Model Context Protocol (MCP)
+
+The built-in MCP server exposes DocuChat's document intelligence directly to AI coding tools and desktop assistants.
+
+#### Registered MCP Tools:
+- `docuchat_list_documents(limit)`: List documents in company workspace.
+- `docuchat_upload_document(file_path, content, filename)`: Ingest and index local file or raw text.
+- `docuchat_search_chunks(query, document_id, top_k)`: Hybrid vector + BM25 keyword search with citations.
+- `docuchat_query_document(document_id, question)`: Grounded RAG Q&A.
+- `docuchat_extract_invoice(document_id, query)`: Structured invoice line items, tax, and totals JSON.
+- `docuchat_analyze_contract(document_id, query)`: Contract liabilities, indemnities, and termination terms.
+- `docuchat_audit_compliance(document_id, query)`: PII detection, GDPR/HIPAA risk score, redactions.
+- `docuchat_parse_form(document_id, query)`: Extract form fields, checkboxes `[X]`, and tables.
+- `docuchat_summarize_document(document_id, query)`: Executive summary with key findings.
+- `docuchat_compare_documents(document_id_a, document_id_b)`: Cross-document discrepancy analysis.
+- `docuchat_get_company_credits()`: Check real-time credit balance and pricing.
+
+#### Connect to Local Claude Code (CLI):
+```bash
+# Register DocuChat MCP server with Claude Code
+claude mcp add docuchat -- python3 -m backend.mcp.server
+
+# Start Claude Code and query your documents
+claude
+> "Upload /path/to/invoice.pdf to DocuChat and extract all line items into a table."
+```
+
+#### Connect to Claude Desktop (Claude Chat):
+Add this block to your `claude_desktop_config.json`:
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "docuchat": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "backend.mcp.server"
+      ],
+      "env": {
+        "DOCUCHAT_API_KEY": "docu_live_your_company_api_key",
+        "DOCUCHAT_BASE_URL": "http://127.0.0.1:8000"
+      }
+    }
+  }
+}
+```
+
+#### Connect via Server-Sent Events (SSE):
+The FastAPI server automatically mounts the MCP SSE transport at:
+- SSE stream: `http://127.0.0.1:8000/mcp/sse`
+- Message endpoint: `http://127.0.0.1:8000/mcp/messages`
+
+---
+
+### 2. Integration with GPT Chats & ChatGPT Actions
+
+#### ChatGPT Custom GPTs (Actions):
+1. In ChatGPT, navigate to **Create a GPT** -> **Configure** -> **Actions** -> **Create new action**.
+2. Click **Import from URL** and enter:
+   `http://127.0.0.1:8000/api/v1/gpt/openapi.json`
+3. Under **Authentication**, select **API Key**, type **Bearer**, and paste your `docu_live_...` API key.
+4. Your Custom GPT now has direct access to upload, search, invoice, contract, and RAG tools!
+
+#### OpenAI Function Calling (Python / LangChain / GPT-4o):
+Fetch ready-to-use tool schemas directly:
+```python
+import httpx
+from openai import OpenAI
+
+openai_client = OpenAI()
+tools = httpx.get("http://127.0.0.1:8000/api/v1/openai/tools").json()["tools"]
+
+response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    messages=[{"role": "user", "content": "Extract invoice items from doc-9812"}],
+    tools=tools,
+)
+```
+
+---
+
+### 3. B2B Pipeline REST API & Python SDK
+
+Automate document processing inside Apache Airflow, Prefect, Celery, or GitHub Actions.
+
+#### Python Pipeline SDK (`DocuChatClient`):
+```python
+from backend.sdk import DocuChatClient
+
+client = DocuChatClient(
+    api_key="docu_live_your_key",
+    base_url="http://127.0.0.1:8000"
+)
+
+# 1. Ingest document into pipeline
+doc = client.upload_document("invoices/october_batch.pdf")
+doc_id = doc["documentId"]
+
+# 2. Extract structured invoice JSON
+result = client.extract_invoice(doc_id)
+print("Vendor:", result["data"]["vendor"])
+print("Total:", result["data"]["total"])
+print("Credits Remaining:", result["creditsRemaining"])
+
+# 3. Hybrid search across document chunks
+matches = client.search(doc_id, query="Payment terms and late fees", top_k=3)
+```
+
+#### Core Pipeline Endpoints:
+| Method | Endpoint | Description |
+| --- | --- | --- |
+| `POST` | `/api/v1/documents/upload` | Ingest multipart file or JSON text content, returns `documentId`. |
+| `GET` | `/api/v1/documents` | List company documents with pagination (`limit`, `offset`). |
+| `GET` | `/api/v1/documents/{id}` | Inspect document status, size, and page breakdown. |
+| `GET` | `/api/v1/documents/{id}/search` | Semantic embedding + BM25 keyword search with citations. |
+| `POST` | `/api/v1/pipeline/run` | Execute specialized AI agent (`invoice`, `contract`, `compliance`, `summary`, `form_parser`) with automated credit deduction and refund on error. Supports `webhook_url`. |
+| `POST` | `/api/v1/pipeline/jobs` | Submit asynchronous background pipeline job to Redis worker queue (returns `202 Accepted` + `jobId`). |
+| `GET` | `/api/v1/pipeline/jobs/{id}` | Poll background job progress (0-100) and structured output. |
+| `GET` | `/api/v1/pipeline/jobs` | List recent background pipeline jobs. |
+| `POST` | `/api/v1/pipeline/batch` | Execute batch multi-document workloads. |
+| `GET` | `/api/v1/storage/status` | MinIO object storage health, active bucket, and endpoint. |
+| `GET` | `/api/v1/storage/documents/{id}/presigned-url` | Generate secure MinIO presigned download/view URL. |
+| `GET` | `/api/v1/gpt/openapi.json` | ChatGPT Custom GPT Actions OpenAPI 3.1 specification. |
+| `GET` | `/api/v1/openai/tools` | OpenAI function calling schema array. |
+| `GET` | `/api/v1/company/account` | Current trial credits (1,200 initial) and plan tier. |
+| `GET` | `/api/v1/company/pricing` | Credit consumption rates per LLM tier. |
+
+---
+
+### 4. Bilingual (English & Arabic) Document Intelligence Suite
+
+DocuChat includes specialized agents optimized specifically for Arabic & English enterprise pipelines, GCC/Saudi regulatory formats (ZATCA, Iqama, Saudi National IDs, GCC IBANs, Commercial Registrations):
+
+| Service | Arabic Name | Description | Credits |
+| --- | --- | --- | :---: |
+| **`redaction`** | **حجب البيانات وتطهير الوثائق** | Automatically redacts PII in Arabic & English (Saudi National ID, Iqama, GCC IBANs `SA...`/`AE...`/`EG...`, Tax IDs, phones, emails). | **25** |
+| **`classifier`** | **تصنيف وتوجيه المستندات** | Classifies incoming documents (Invoice, Contract, Financial Statement, Resume, CR, Government Letter) and outputs language (`ar`/`en`), urgency, and target routing department. | **15** |
+| **`financial_statement`** | **تحليل القوائم المالية** | Extracts balance sheet and P&L metrics under IFRS & SOCPA (Revenue, EBIT, Net Income, Assets, Liabilities, Equity) and computes Gross & Net margins and Debt-to-Equity ratios. | **35** |
+| **`translation`** | **الترجمة القانونية المعتمدة** | Bidirectional certified legal & corporate translation (EN ↔ AR) preserving exact clause numbering, tables, and monetary figures. | **20** |
+| **`anomaly_audit`** | **تدقيق الاحتيال والتناقضات** | Forensic check for arithmetic mismatches, ZATCA VAT 15% calculation errors, inverted date chronologies, and contractual clause contradictions. | **25** |
+
+#### Cryptographic Webhook Security (HMAC-SHA256)
+All asynchronous webhooks dispatched by the Redis worker include cryptographic signatures to ensure zero-trust pipeline authenticity:
+```http
+POST https://api.mycorp.com/docuchat-webhook
+Content-Type: application/json
+X-DocuChat-Timestamp: 1730000000
+X-DocuChat-Signature: sha256=a1b2c3d4e5f6...
+```
+Consumers can verify authenticity using `hmac.new(secret, timestamp + "." + body, sha256).hexdigest()`.
+
+
