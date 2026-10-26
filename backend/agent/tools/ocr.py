@@ -1,7 +1,7 @@
 """
 OCR tools for the agent framework.
 
-Adapted from the standalone ``pdf_ocr`` project to work within this
+Adapted from the standalone ``pdf_ocr_service`` project to work within this
 project's agent architecture.  Supports vision-based extraction from scanned
 PDFs using OpenAI-compatible vision models (e.g. ``gpt-4o`` / ``gpt-4o-mini``).
 
@@ -28,7 +28,7 @@ class OcrError(Exception):
 class PdfRenderer:
     """Render PDF pages into PNG bytes for vision models.
 
-    Adapted from ``pdf_ocr``'s ``PdfRenderer`` — uses ``pypdfium2`` for
+    Adapted from ``pdf_ocr_service``'s ``PdfRenderer`` — uses ``pypdfium2`` for
     high-quality rendering.
     """
 

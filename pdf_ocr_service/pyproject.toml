@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-llm-ocr"
+version = "0.1.0"
+description = "Convert Arabic PDFs to structured Markdown with Gemini OCR."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "pdf-llm-ocr contributors" }]
+keywords = ["pdf", "ocr", "gemini", "arabic", "markdown"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Text Processing :: General",
+]
+dependencies = [
+  "Pillow>=10.3.0",
+  "pypdf>=4.2.0",
+  "pypdfium2>=4.30.0",
+  "requests>=2.31.0,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+  "build>=1.2.1",
+  "pytest>=8.0",
+]
+
+[project.scripts]
+pdf-llm-ocr = "pdf_llm_ocr.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/Clean-code-org/pdf-llm-ocr#readme"
+Issues = "https://github.com/Clean-code-org/pdf-llm-ocr/issues"
+Source = "https://github.com/Clean-code-org/pdf-llm-ocr"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["pdf_llm_ocr*", "arabic_pdf_md_agent*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

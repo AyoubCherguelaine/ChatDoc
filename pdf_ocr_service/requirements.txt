@@ -1,0 +1,4 @@
+Pillow>=10.3.0
+pypdf>=4.2.0
+pypdfium2>=4.30.0
+requests>=2.31.0,<3

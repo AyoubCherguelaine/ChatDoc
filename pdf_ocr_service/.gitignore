@@ -1,0 +1,13 @@
+# Python / venv
+venv/
+__pycache__/
+*.pyc
+
+# Local env
+.env
+
+# Runtime artifacts
+output/
+
+# Session logs
+ai_sessions/
