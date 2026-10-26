@@ -247,6 +247,9 @@ export interface DocumentAIServiceResponse {
   filename: string;
   service: string;
   result: string;
+  data?: any;
+  creditsDeducted?: number;
+  creditsRemaining?: number;
   success: boolean;
   iterations: number;
   steps: Array<{ thought?: string; action?: string; observation?: string }>;

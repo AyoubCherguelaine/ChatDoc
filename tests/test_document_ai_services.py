@@ -309,3 +309,57 @@ class TestRAGFactoryAndCoordinator:
         result = coordinator.run("Process receipt.pdf")
         assert result.success is True
         assert "34.38" in result.response
+
+    def test_invoice_and_prose_structured_extraction(self):
+        from backend.v1.routes import extract_structured_data, _extract_json_from_text
+        from backend.server import _format_service_result
+
+        # Test 1: Markdown prose with bullet points
+        prose = """
+Here are the extracted invoice details:
+- Vendor Name: Gulf Consulting Services
+- Tax ID: 310293847500003
+- Invoice Number: INV-88219
+- Invoice Date: 2026-10-15
+- Total Amount: 4,500.00 SAR
+- VAT 15%: 675.00 SAR
+- Grand Total: 5,175.00 SAR
+        """
+        extracted = extract_structured_data(prose, service="invoice")
+        assert isinstance(extracted, dict)
+        assert extracted.get("vendor_name") == "Gulf Consulting Services"
+        assert extracted.get("invoice_number") == "INV-88219"
+        assert extracted.get("grand_total") == "5,175.00 SAR"
+
+        # Test 2: Fenced code block with commentary
+        fenced = """
+Analysis complete:
+```json
+{
+  "vendor": "Acme Tools Ltd",
+  "invoice_number": "INV-001",
+  "total": 1250.00,
+  "line_items": [
+    {"description": "Cloud hosting", "amount": 1250.00}
+  ]
+}
+```
+Thank you.
+        """
+        parsed_fenced = _extract_json_from_text(fenced)
+        assert isinstance(parsed_fenced, dict)
+        assert parsed_fenced["vendor"] == "Acme Tools Ltd"
+        assert parsed_fenced["total"] == 1250.00
+
+        # Test 3: _format_service_result guarantees data and result
+        doc = {"id": "doc-test-1", "original_filename": "invoice_sample.pdf"}
+        agent_res = AgentResult(response=prose, steps=[], success=True, iterations=2)
+        bundle_mock = MagicMock()
+        formatted = _format_service_result(doc, "invoice", agent_res, bundle_mock, cost=10, remaining=990)
+        assert formatted["success"] is True
+        assert formatted["data"] is not None
+        assert isinstance(formatted["data"], dict)
+        assert "grand_total" in formatted["data"]
+        # result must be pretty-printed JSON
+        parsed_from_result = json.loads(formatted["result"])
+        assert parsed_from_result["invoice_number"] == "INV-88219"

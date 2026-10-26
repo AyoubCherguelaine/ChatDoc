@@ -114,10 +114,25 @@ def execute_job_task(job: Job) -> Job:
             return job
 
         # Format result
-        from backend.v1.routes import _extract_json_from_text
+        from backend.v1.routes import _extract_json_from_text, extract_structured_data
 
         raw_text = res.response or ""
         parsed_json = _extract_json_from_text(raw_text)
+
+        if parsed_json is None and hasattr(res, "steps") and res.steps:
+            for step in reversed(res.steps):
+                obs = step.get("observation", "")
+                if isinstance(obs, str) and ("{" in obs or "[" in obs):
+                    step_json = _extract_json_from_text(obs)
+                    if step_json:
+                        parsed_json = step_json
+                        break
+
+        is_structured = service_name in [
+            "invoice", "receipt", "contract", "compliance", "form_parser", "financial_statement"
+        ]
+        if (job.output_format == "json" or is_structured) and parsed_json is None:
+            parsed_json = extract_structured_data(raw_text, service=service_name)
 
         result_payload = {
             "status": "success",

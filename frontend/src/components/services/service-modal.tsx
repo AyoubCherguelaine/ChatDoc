@@ -19,6 +19,9 @@ import {
   Check,
   AlertCircle,
   Coins,
+  FileJson,
+  Table2,
+  Code2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -81,6 +84,7 @@ export function ServiceLauncherModal({
   const [running, setRunning] = useState(false);
   const [runError, setRunError] = useState("");
   const [runResult, setRunResult] = useState<DocumentAIServiceResponse | null>(null);
+  const [resultTab, setResultTab] = useState<"structured" | "json" | "raw">("json");
   const [copied, setCopied] = useState(false);
 
   // Reset state when opening/closing
@@ -190,9 +194,38 @@ export function ServiceLauncherModal({
     }
   };
 
+  const jsonData = useMemo(() => {
+    if (!runResult) return null;
+    if (runResult.data && typeof runResult.data === "object") {
+      return runResult.data;
+    }
+    if (runResult.result) {
+      try {
+        const parsed = JSON.parse(runResult.result);
+        if (typeof parsed === "object") return parsed;
+      } catch {
+        const match = runResult.result.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (match) {
+          try {
+            return JSON.parse(match[1]);
+          } catch {}
+        }
+      }
+    }
+    return null;
+  }, [runResult]);
+
   const copyResult = () => {
     if (!runResult?.result) return;
     navigator.clipboard.writeText(runResult.result);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const copyJson = () => {
+    const textToCopy = jsonData ? JSON.stringify(jsonData, null, 2) : runResult?.result || "";
+    if (!textToCopy) return;
+    navigator.clipboard.writeText(textToCopy);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -252,18 +285,133 @@ export function ServiceLauncherModal({
                   <CheckCircle2 size={16} className="text-emerald-600" />
                   <span className="font-semibold">Analysis completed successfully!</span>
                 </div>
-                <button
-                  onClick={copyResult}
-                  className="inline-flex items-center gap-1 font-medium text-emerald-900 hover:underline"
-                >
-                  {copied ? <Check size={13} /> : <Copy size={13} />}
-                  {copied ? "Copied" : "Copy output"}
-                </button>
+                <div className="flex items-center gap-2">
+                  {jsonData && (
+                    <button
+                      onClick={copyJson}
+                      className="inline-flex items-center gap-1 font-semibold text-teal-800 bg-teal-100 hover:bg-teal-200 px-2.5 py-1 rounded transition-colors"
+                      title="Copy structured JSON"
+                    >
+                      {copied ? <Check size={12} /> : <FileJson size={12} />}
+                      {copied ? "Copied JSON" : "Copy JSON"}
+                    </button>
+                  )}
+                  <button
+                    onClick={copyResult}
+                    className="inline-flex items-center gap-1 font-medium text-emerald-900 hover:underline"
+                  >
+                    {copied ? <Check size={13} /> : <Copy size={13} />}
+                    {copied ? "Copied" : "Copy output"}
+                  </button>
+                </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 font-mono text-xs text-slate-800 max-h-72 overflow-y-auto whitespace-pre-wrap leading-relaxed shadow-inner">
-                {runResult.result}
-              </div>
+              {/* Result View Tabs */}
+              {jsonData && (
+                <div className="flex items-center gap-1 border-b border-slate-200 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setResultTab("json")}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      resultTab === "json"
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <FileJson size={13} /> JSON Payload
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResultTab("structured")}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      resultTab === "structured"
+                        ? "bg-teal-700 text-white shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Table2 size={13} /> Structured Cards
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setResultTab("raw")}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      resultTab === "raw"
+                        ? "bg-slate-200 text-slate-800 shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    <Code2 size={13} /> Raw Output
+                  </button>
+                </div>
+              )}
+
+              {/* View Content */}
+              {resultTab === "json" && jsonData ? (
+                <div className="rounded-xl border border-slate-800 bg-slate-950 p-4 font-mono text-xs text-emerald-400 max-h-80 overflow-y-auto whitespace-pre leading-relaxed shadow-inner">
+                  {JSON.stringify(jsonData, null, 2)}
+                </div>
+              ) : resultTab === "structured" && jsonData ? (
+                <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                    {Object.entries(jsonData)
+                      .filter(([k]) => !["line_items", "items", "raw", "raw_text", "steps"].includes(k))
+                      .slice(0, 9)
+                      .map(([k, v]) => (
+                        <div key={k} className="rounded-lg border border-slate-200 bg-white p-2.5 shadow-xs">
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                            {k.replace(/_/g, " ")}
+                          </p>
+                          <p className="mt-1 text-xs font-semibold text-slate-800 truncate" title={typeof v === "object" ? JSON.stringify(v) : String(v)}>
+                            {typeof v === "object" ? (v && (v as any).name ? String((v as any).name) : JSON.stringify(v)) : String(v ?? "—")}
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+
+                  {/* Line Items Table if available */}
+                  {(Array.isArray(jsonData.line_items) || Array.isArray(jsonData.items)) && (
+                    <div className="mt-3 overflow-hidden rounded-lg border border-slate-200">
+                      <div className="bg-slate-100 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600">
+                        Line Items Breakdown
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-slate-600 font-semibold border-b border-slate-100">
+                            <tr>
+                              <th className="p-2">Description</th>
+                              <th className="p-2 text-center">Qty</th>
+                              <th className="p-2 text-right">Price</th>
+                              <th className="p-2 text-right">Amount</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 bg-white">
+                            {(jsonData.line_items || jsonData.items).map((item: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-slate-50">
+                                <td className="p-2 font-medium text-slate-800">
+                                  {item.description || item.item || item.name || `Item ${idx + 1}`}
+                                </td>
+                                <td className="p-2 text-center text-slate-600">
+                                  {item.quantity || item.qty || 1}
+                                </td>
+                                <td className="p-2 text-right text-slate-600">
+                                  {item.unit_price || item.price || "—"}
+                                </td>
+                                <td className="p-2 text-right font-semibold text-slate-900">
+                                  {item.amount || item.total || "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 font-mono text-xs text-slate-800 max-h-72 overflow-y-auto whitespace-pre-wrap leading-relaxed shadow-inner">
+                  {runResult.result}
+                </div>
+              )}
 
               <div className="flex items-center justify-between pt-2">
                 <Button

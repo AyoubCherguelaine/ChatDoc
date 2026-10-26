@@ -36,22 +36,43 @@ class PdfRenderer:
     def _pdfium_module():
         try:
             import pypdfium2 as pdfium  # type: ignore
-        except ImportError as exc:
-            raise OcrError(
-                "Missing dependency 'pypdfium2'. Install with: pip install pypdfium2"
-            ) from exc
-        return pdfium
+            if pdfium is not None:
+                return pdfium
+        except (ImportError, ModuleNotFoundError):
+            pass
+        raise OcrError("Missing dependency 'pypdfium2'. Install with: pip install pypdfium2")
 
     def page_count(self, pdf_path: Path) -> int:
+        pdf_path = Path(pdf_path)
+        # Try pypdfium2 if present
+        try:
+            import pypdfium2 as pdfium  # type: ignore
+            if pdfium is not None:
+                document = pdfium.PdfDocument(str(pdf_path))
+                try:
+                    return len(document)
+                finally:
+                    document.close()
+        except OcrError:
+            raise
+        except Exception:
+            pass
+
+        # Try fitz (PyMuPDF)
+        try:
+            import fitz
+            doc = fitz.open(str(pdf_path))
+            try:
+                return doc.page_count
+            finally:
+                doc.close()
+        except Exception:
+            pass
+
+        # Fallback to trigger descriptive error
         pdfium = self._pdfium_module()
-        try:
-            document = pdfium.PdfDocument(str(pdf_path))
-        except Exception as exc:
-            raise OcrError(f"Failed to open PDF {pdf_path}: {exc}") from exc
-        try:
-            return len(document)
-        finally:
-            document.close()
+        document = pdfium.PdfDocument(str(pdf_path))
+        return len(document)
 
     @staticmethod
     def _render_page_to_png(page, scale: float) -> bytes:
@@ -75,23 +96,41 @@ class PdfRenderer:
         dpi: int = 260,
     ) -> Optional[bytes]:
         """Render a single 1-indexed page to PNG bytes."""
-        pdfium = self._pdfium_module()
+        pdf_path = Path(pdf_path)
+        # Try pypdfium2 first
         try:
-            document = pdfium.PdfDocument(str(pdf_path))
+            import pypdfium2 as pdfium  # type: ignore
+            if pdfium is not None:
+                document = pdfium.PdfDocument(str(pdf_path))
+                page_total = len(document)
+                if page_number < 1 or page_number > page_total:
+                    document.close()
+                    return None
+                scale = max(dpi, 72) / 72.0
+                try:
+                    page = document[page_number - 1]
+                    return self._render_page_to_png(page=page, scale=scale)
+                finally:
+                    document.close()
+        except Exception:
+            pass
+
+        # Try fitz (PyMuPDF)
+        try:
+            import fitz
+            doc = fitz.open(str(pdf_path))
+            try:
+                if page_number < 1 or page_number > doc.page_count:
+                    return None
+                page = doc[page_number - 1]
+                pix = page.get_pixmap(dpi=dpi)
+                return pix.tobytes("png")
+            finally:
+                doc.close()
         except Exception as exc:
-            raise OcrError(f"Failed to open PDF {pdf_path}: {exc}") from exc
+            raise OcrError(f"Failed to open/render PDF {pdf_path}: {exc}") from exc
 
-        page_total = len(document)
-        if page_number < 1 or page_number > page_total:
-            document.close()
-            return None
-
-        scale = max(dpi, 72) / 72.0
-        try:
-            page = document[page_number - 1]
-            return self._render_page_to_png(page=page, scale=scale)
-        finally:
-            document.close()
+        return None
 
     def render_pages(
         self,
@@ -119,7 +158,26 @@ class PdfRenderer:
         return results
 
 
-OCR_PAGE_PROMPT = """You are a precise OCR engine. Transcribe the text visible in this image exactly as it appears. Do not summarize, translate, or add commentary. If text is unclear, write [unclear]. Return plain text."""
+OCR_PAGE_PROMPT = """\
+You are an advanced document OCR and layout analysis engine.
+Transcribe the content visible in this page image with 100% precision.
+
+Formatting guidelines:
+1. Preserve structural layout using markdown: headings (##, ###), bullet lists, and paragraphs.
+2. Render all tabular data (pricing tables, line items, account balances, tax columns) as GitHub Flavored Markdown (GFM) tables:
+| Description | Qty | Unit Price | Total |
+|---|---|---|---|
+| Item Name | 1 | 100.00 | 100.00 |
+3. Capture both Arabic and English text in correct reading order and typography.
+4. If this page contains a transaction, invoice, receipt, contract, or form, append a clean structured JSON block at the bottom:
+```json
+{
+  "document_type": "invoice|receipt|contract|form|statement|other",
+  ...
+}
+```
+Do not output extraneous conversational filler. Output the transcribed document layout directly.
+"""
 
 
 INVOICE_OCR_PROMPT = """You are an invoice data extraction engine. Analyse the invoice image and extract structured data. Return ONLY valid JSON. Include: vendor (name, address, email, phone), client (name, address, email), invoice_number, invoice_date (ISO YYYY-MM-DD), due_date (ISO YYYY-MM-DD), currency, line_items (list of {description, quantity, unit_price, amount}), subtotal, tax_total, tax_rate, total, payment_terms, po_number, notes. Do not add any explanation outside the JSON. If a field is not visible, use null."""

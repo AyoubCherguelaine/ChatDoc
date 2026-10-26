@@ -173,3 +173,81 @@ class TestExtractPagesText:
 
         with pytest.raises(ValueError, match="out of range"):
             extract_pages_text("/fake/doc.pdf", 5, 10)
+
+
+class TestTableAndOcrPdfLoader:
+    @patch("backend.documents.pdf_loader.fitz")
+    def test_load_pdf_with_tables(self, mock_fitz):
+        mock_page = MagicMock()
+        mock_page.get_text.return_value = "Here is some introductory text that is long enough to exceed eighty characters in length so that it does not trigger OCR fallback."
+
+        mock_table = MagicMock()
+        mock_table.extract.return_value = [
+            ["Description", "Quantity", "Amount"],
+            ["Consulting Services", "10", "$1500"],
+            ["Hosting Setup", "1", "$250"],
+        ]
+        mock_tab_finder = MagicMock()
+        mock_tab_finder.tables = [mock_table]
+        mock_page.find_tables.return_value = mock_tab_finder
+
+        mock_doc = MagicMock()
+        mock_doc.page_count = 1
+        mock_doc.__iter__ = lambda self: iter([mock_page])
+        mock_fitz.open.return_value = mock_doc
+
+        doc = load_pdf("/fake/invoice.pdf")
+        assert len(doc.pages) == 1
+        page = doc.pages[0]
+        assert len(page.tables) == 1
+        assert "| Description | Quantity | Amount |" in page.tables[0]
+        assert "| Consulting Services | 10 | $1500 |" in page.tables[0]
+        assert "### Extracted Tables" in page.text
+
+    @patch("backend.agent.tools.ocr.OcrService.ocr_read_page")
+    @patch("backend.documents.pdf_loader.fitz")
+    def test_load_pdf_sparse_triggers_ocr(self, mock_fitz, mock_ocr_read):
+        mock_page = MagicMock()
+        mock_page.get_text.return_value = "Scanned scan"
+        mock_page.find_tables.return_value = None
+
+        mock_doc = MagicMock()
+        mock_doc.page_count = 1
+        mock_doc.__iter__ = lambda self: iter([mock_page])
+        mock_fitz.open.return_value = mock_doc
+
+        mock_ocr_read.return_value = "### Invoice #1234\nClient: ACME Corp\nTotal: $500"
+
+        doc = load_pdf("/fake/scanned_invoice.pdf")
+        assert len(doc.pages) == 1
+        page = doc.pages[0]
+        assert page.is_ocr is True
+        assert "Invoice #1234" in page.text
+        assert mock_ocr_read.called
+
+    @patch("backend.documents.pdf_loader.fitz")
+    def test_load_pdf_extracts_structured_json(self, mock_fitz):
+        mock_page = MagicMock()
+        mock_page.get_text.return_value = (
+            "Invoice Summary\n\n"
+            "```json\n"
+            "{\n"
+            '  "invoice_number": "INV-2026-001",\n'
+            '  "vendor": "Test Vendor",\n'
+            '  "total_amount": 1250.00\n'
+            "}\n"
+            "```\n"
+            "Thank you for your business!"
+        )
+        mock_page.find_tables.return_value = None
+
+        mock_doc = MagicMock()
+        mock_doc.page_count = 1
+        mock_doc.__iter__ = lambda self: iter([mock_page])
+        mock_fitz.open.return_value = mock_doc
+
+        doc = load_pdf("/fake/invoice_with_json.pdf")
+        assert doc.structured_data is not None
+        assert doc.structured_data.get("invoice_number") == "INV-2026-001"
+        assert doc.structured_data.get("vendor") == "Test Vendor"
+

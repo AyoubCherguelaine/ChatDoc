@@ -165,22 +165,51 @@ async def _dispatch_webhook(url: str, payload: Dict[str, Any], secret: Optional[
 
 def _extract_json_from_text(text: str) -> Optional[Dict[str, Any] | List[Any]]:
     """Extract embedded JSON blocks or valid JSON from agent response."""
+    if not text:
+        return None
     text = text.strip()
-    # Try direct parse
+    # 1. Try direct parse
     try:
         return json.loads(text)
     except Exception:
         pass
 
-    # Try fenced code blocks ```json ... ```
+    # 2. Try fenced code blocks ```json ... ```
     match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
     if match:
         try:
-            return json.loads(match.group(1))
+            return json.loads(match.group(1).strip())
         except Exception:
             pass
 
-    # Try curly brackets
+    # 3. Try balanced braces search
+    start = text.find("{")
+    while start != -1:
+        depth = 0
+        in_string = False
+        escape = False
+        for i in range(start, len(text)):
+            c = text[i]
+            if c == '"' and not escape:
+                in_string = not in_string
+            elif not in_string:
+                if c == "{":
+                    depth += 1
+                elif c == "}":
+                    depth -= 1
+                    if depth == 0:
+                        candidate = text[start : i + 1]
+                        try:
+                            res = json.loads(candidate)
+                            if isinstance(res, (dict, list)):
+                                return res
+                        except Exception:
+                            pass
+                        break
+            escape = (c == "\\" and not escape)
+        start = text.find("{", start + 1)
+
+    # 4. Try greedy curly brackets fallback
     curly = re.search(r"(\{[\s\S]*\})", text)
     if curly:
         try:
@@ -189,6 +218,38 @@ def _extract_json_from_text(text: str) -> Optional[Dict[str, Any] | List[Any]]:
             pass
 
     return None
+
+
+def extract_structured_data(text: str, service: str = "general") -> Dict[str, Any]:
+    """Extract structured dictionary from text, falling back to parsed key-value lines."""
+    parsed = _extract_json_from_text(text)
+    if isinstance(parsed, dict) and parsed:
+        return parsed
+    if isinstance(parsed, list):
+        return {"items": parsed, "count": len(parsed)}
+
+    # Parse prose bullet points or key-value lines
+    data: Dict[str, Any] = {}
+    current_key = None
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("```") or line.startswith("==="):
+            continue
+        clean = re.sub(r"^[-*•#\d\.\s]+", "", line).strip()
+        if ":" in clean:
+            k, v = clean.split(":", 1)
+            k = re.sub(r"[*_#]", "", k).strip().lower().replace(" ", "_").replace("-", "_")
+            v = re.sub(r"^\*\*|\*\*$", "", v).strip()
+            if k and v:
+                data[k] = v
+                current_key = k
+        elif current_key and clean:
+            if isinstance(data[current_key], str):
+                data[current_key] += " " + clean
+    if data:
+        return data
+
+    return {"summary": text.strip() if text else "No content extracted", "service": service}
 
 
 # ---------------------------------------------------------------------------
@@ -513,6 +574,23 @@ async def pipeline_run_service(
     raw_text = result.response or ""
     parsed_json = _extract_json_from_text(raw_text)
 
+    # Check steps for tool observations if not in final response
+    if parsed_json is None and hasattr(result, "steps") and result.steps:
+        for step in reversed(result.steps):
+            obs = step.get("observation", "")
+            if isinstance(obs, str) and ("{" in obs or "[" in obs):
+                step_json = _extract_json_from_text(obs)
+                if step_json:
+                    parsed_json = step_json
+                    break
+
+    # If JSON output is requested or it is a structured extraction service, guarantee structured data
+    is_structured_service = service_name in [
+        "invoice", "receipt", "contract", "compliance", "form_parser", "financial_statement", "redaction", "classifier"
+    ]
+    if (payload.output_format == "json" or is_structured_service) and parsed_json is None:
+        parsed_json = extract_structured_data(raw_text, service=service_name)
+
     response_data: Dict[str, Any] = {
         "status": "success",
         "service": service_name,
@@ -524,7 +602,7 @@ async def pipeline_run_service(
     }
 
     if payload.output_format == "json" or parsed_json is not None:
-        response_data["data"] = parsed_json or {"raw": raw_text}
+        response_data["data"] = parsed_json
 
     response.headers["X-Credits-Cost"] = str(cost)
     response.headers["X-Credits-Remaining"] = str(remaining)

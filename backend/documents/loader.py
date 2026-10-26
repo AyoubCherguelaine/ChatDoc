@@ -17,7 +17,19 @@ def load_document(file_path: str | Path) -> PDFDocument:
     if ext == ".pdf":
         result = load_pdf(str(path))
         if not any(p.text.strip() for p in result.pages):
-            raise ValueError("No readable text found. Scanned PDFs need OCR before upload.")
+            # Automatically run OCR on scanned or non-text PDFs
+            result = load_pdf(str(path), force_ocr=True)
+            if not any(p.text.strip() for p in result.pages):
+                raise ValueError("No readable text found. Scanned PDFs need OCR before upload.")
+
+        # If structured data was extracted (e.g. invoice or receipt), append JSON block to page 1
+        if result.structured_data and result.pages:
+            import json
+            from backend.v1.routes import _extract_json_from_text
+            first_page_text = result.pages[0].text
+            if not _extract_json_from_text(first_page_text):
+                json_str = json.dumps(result.structured_data, indent=2, ensure_ascii=False)
+                result.pages[0].text += f"\n\n### Extracted Structured Data (JSON)\n```json\n{json_str}\n```\n"
         return result
     sections: list[str] = []
     if ext in {".docx", ".xlsx"}:

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import logging
 import tempfile
 import uuid
@@ -34,7 +35,11 @@ from backend.documents.loader import SUPPORTED_EXTENSIONS
 from backend.jobs import job_queue, start_background_worker
 from backend.mcp.server import mcp_server
 from backend.storage import storage_service
-from backend.v1.routes import router as v1_router
+from backend.v1.routes import (
+    _extract_json_from_text,
+    extract_structured_data,
+    router as v1_router,
+)
 
 from . import rag
 from .auth import (
@@ -823,6 +828,65 @@ class DocumentAIServicePayload(BaseModel):
     model: str | None = None
 
 
+def _format_service_result(
+    doc: dict,
+    service_name: str,
+    result: Any,
+    bundle: Any,
+    cost: int,
+    remaining: int,
+) -> dict:
+    raw_text = getattr(result, "response", "") or ""
+    parsed_json = _extract_json_from_text(raw_text)
+
+    # Check agent steps for tool observations if not in final response
+    if parsed_json is None and hasattr(result, "steps") and result.steps:
+        for step in reversed(result.steps):
+            obs = step.get("observation", "")
+            if isinstance(obs, str) and ("{" in obs or "[" in obs):
+                step_json = _extract_json_from_text(obs)
+                if step_json:
+                    parsed_json = step_json
+                    break
+
+    # If still not found, check if enhanced document toolkit has extractor tool
+    if parsed_json is None and hasattr(bundle, "toolkit"):
+        tk = bundle.toolkit
+        filename = doc["original_filename"]
+        try:
+            if service_name == "invoice" and hasattr(tk, "extract_invoice_data"):
+                tool_out = tk.extract_invoice_data(filename)
+                parsed_json = _extract_json_from_text(tool_out)
+            elif service_name == "contract" and hasattr(tk, "extract_contract_data"):
+                tool_out = tk.extract_contract_data(filename)
+                parsed_json = _extract_json_from_text(tool_out)
+        except Exception as tk_err:
+            logging.warning("Fallback extractor failed for %s: %s", service_name, tk_err)
+
+    # Guarantee structured dictionary
+    if parsed_json is None:
+        parsed_json = extract_structured_data(raw_text, service=service_name)
+
+    formatted_result = (
+        json.dumps(parsed_json, indent=2, ensure_ascii=False)
+        if isinstance(parsed_json, (dict, list))
+        else raw_text
+    )
+
+    return {
+        "documentId": str(doc["id"]),
+        "filename": doc["original_filename"],
+        "service": service_name,
+        "result": formatted_result,
+        "data": parsed_json,
+        "creditsDeducted": cost,
+        "creditsRemaining": remaining,
+        "success": result.success,
+        "iterations": result.iterations,
+        "steps": result.steps,
+    }
+
+
 @app.post("/api/documents/{doc_id}/receipt")
 def analyze_receipt(
     doc_id: str,
@@ -892,17 +956,7 @@ def analyze_receipt(
             detail=f"Receipt service error: {exc}. Credits refunded (Remaining: {remaining}).",
         )
 
-    return {
-        "documentId": str(doc["id"]),
-        "filename": doc["original_filename"],
-        "service": "receipt",
-        "result": result.response or "",
-        "creditsDeducted": cost,
-        "creditsRemaining": remaining,
-        "success": result.success,
-        "iterations": result.iterations,
-        "steps": result.steps,
-    }
+    return _format_service_result(doc, "receipt", result, bundle, cost, remaining)
 
 
 @app.post("/api/documents/{doc_id}/resume")
@@ -974,17 +1028,7 @@ def analyze_resume(
             detail=f"Resume service error: {exc}. Credits refunded (Remaining: {remaining}).",
         )
 
-    return {
-        "documentId": str(doc["id"]),
-        "filename": doc["original_filename"],
-        "service": "resume",
-        "result": result.response or "",
-        "creditsDeducted": cost,
-        "creditsRemaining": remaining,
-        "success": result.success,
-        "iterations": result.iterations,
-        "steps": result.steps,
-    }
+    return _format_service_result(doc, "resume", result, bundle, cost, remaining)
 
 
 @app.post("/api/documents/{doc_id}/compliance")
@@ -1056,17 +1100,7 @@ def audit_compliance(
             detail=f"Compliance service error: {exc}. Credits refunded (Remaining: {remaining}).",
         )
 
-    return {
-        "documentId": str(doc["id"]),
-        "filename": doc["original_filename"],
-        "service": "compliance",
-        "result": result.response or "",
-        "creditsDeducted": cost,
-        "creditsRemaining": remaining,
-        "success": result.success,
-        "iterations": result.iterations,
-        "steps": result.steps,
-    }
+    return _format_service_result(doc, "compliance", result, bundle, cost, remaining)
 
 
 @app.post("/api/documents/{doc_id}/form-parser")
@@ -1138,17 +1172,7 @@ def parse_form_fields(
             detail=f"Form parser service error: {exc}. Credits refunded (Remaining: {remaining}).",
         )
 
-    return {
-        "documentId": str(doc["id"]),
-        "filename": doc["original_filename"],
-        "service": "form_parser",
-        "result": result.response or "",
-        "creditsDeducted": cost,
-        "creditsRemaining": remaining,
-        "success": result.success,
-        "iterations": result.iterations,
-        "steps": result.steps,
-    }
+    return _format_service_result(doc, "form_parser", result, bundle, cost, remaining)
 
 
 @app.post("/api/documents/{doc_id}/comparison")
@@ -1348,7 +1372,10 @@ def analyze_invoice(
     model = payload.model or settings.DEFAULT_MODEL
     agent = rag._build_agent(bundle, model, mode="invoice")
     try:
-        result = agent.run(f"Extract all invoice details, line items, and totals from '{doc['original_filename']}'.")
+        result = agent.run(
+            f"Extract all invoice details, line items, taxes, vendor, and totals from '{doc['original_filename']}'. "
+            "Return your final answer as clean, structured JSON only."
+        )
         if not result.success:
             remaining = billing_service.refund_credits(
                 account=account,
@@ -1362,6 +1389,7 @@ def analyze_invoice(
                 "filename": doc["original_filename"],
                 "service": "invoice",
                 "result": result.response or "Invoice service degraded or encountered errors.",
+                "data": None,
                 "creditsDeducted": 0,
                 "creditsRefunded": cost,
                 "creditsRemaining": remaining,
@@ -1384,17 +1412,7 @@ def analyze_invoice(
             detail=f"Invoice service error: {exc}. Credits refunded (Remaining: {remaining}).",
         )
 
-    return {
-        "documentId": str(doc["id"]),
-        "filename": doc["original_filename"],
-        "service": "invoice",
-        "result": result.response or "",
-        "creditsDeducted": cost,
-        "creditsRemaining": remaining,
-        "success": result.success,
-        "iterations": result.iterations,
-        "steps": result.steps,
-    }
+    return _format_service_result(doc, "invoice", result, bundle, cost, remaining)
 
 
 @app.post("/api/documents/{doc_id}/contract")
@@ -1466,17 +1484,7 @@ def analyze_contract(
             detail=f"Contract service error: {exc}. Credits refunded (Remaining: {remaining}).",
         )
 
-    return {
-        "documentId": str(doc["id"]),
-        "filename": doc["original_filename"],
-        "service": "contract",
-        "result": result.response or "",
-        "creditsDeducted": cost,
-        "creditsRemaining": remaining,
-        "success": result.success,
-        "iterations": result.iterations,
-        "steps": result.steps,
-    }
+    return _format_service_result(doc, "contract", result, bundle, cost, remaining)
 
 
 def _execute_specialized_service(
@@ -1548,17 +1556,7 @@ def _execute_specialized_service(
             detail=f"{service_name} service error: {exc}. Credits refunded (Remaining: {remaining}).",
         )
 
-    return {
-        "documentId": str(doc["id"]),
-        "filename": doc["original_filename"],
-        "service": service_name,
-        "result": result.response or "",
-        "creditsDeducted": cost,
-        "creditsRemaining": remaining,
-        "success": result.success,
-        "iterations": result.iterations,
-        "steps": result.steps,
-    }
+    return _format_service_result(doc, service_name, result, bundle, cost, remaining)
 
 
 @app.post("/api/documents/{doc_id}/redaction")

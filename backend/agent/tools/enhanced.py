@@ -671,12 +671,25 @@ class EnhancedDocumentKit:
     # ------------------------------------------------------------------
 
     def extract_invoice_data(self, doc_name: str) -> str:
-        """Extract structured invoice data as JSON using the LLM."""
+        """Extract structured invoice data as JSON using the LLM or vision OCR."""
         doc = self._find_document(doc_name)
         if doc is None:
             return self._list_available_error()
 
+        if hasattr(doc, "structured_data") and doc.structured_data:
+            import json
+            return json.dumps(doc.structured_data, indent=2, ensure_ascii=False)
+
         text = doc.full_text if hasattr(doc, "full_text") and doc.full_text else self._doc_text(doc)
+
+        if not text or len(text.strip()) < 80:
+            # Automatically use vision OCR if text is sparse or scanned
+            try:
+                ocr_res = self.ocr_extract_invoice(doc_name)
+                if ocr_res and not ocr_res.startswith("ERROR:"):
+                    return ocr_res
+            except Exception:
+                pass
 
         if not text:
             return f"ERROR: Could not extract text from '{doc_name}'."
@@ -695,7 +708,7 @@ class EnhancedDocumentKit:
             "due_date (ISO), currency, line_items (list of {description, quantity, "
             "unit_price, amount, tax_rate}), subtotal, tax_total, total, payment_terms, "
             "po_number, notes.\n\n"
-            f"=== DOCUMENT TEXT ===\n{text[:8000]}\n"
+            f"=== DOCUMENT TEXT ===\n{text[:60000]}\n"
         )
         try:
             from langchain_core.messages import HumanMessage
@@ -713,12 +726,25 @@ class EnhancedDocumentKit:
     # ------------------------------------------------------------------
 
     def extract_contract_data(self, doc_name: str) -> str:
-        """Extract structured contract data as JSON using the LLM."""
+        """Extract structured contract data as JSON using the LLM or vision OCR."""
         doc = self._find_document(doc_name)
         if doc is None:
             return self._list_available_error()
 
+        if hasattr(doc, "structured_data") and doc.structured_data:
+            import json
+            return json.dumps(doc.structured_data, indent=2, ensure_ascii=False)
+
         text = doc.full_text if hasattr(doc, "full_text") and doc.full_text else self._doc_text(doc)
+
+        if not text or len(text.strip()) < 80:
+            # Automatically use vision OCR if text is sparse or scanned
+            try:
+                ocr_res = self.ocr_extract_contract(doc_name)
+                if ocr_res and not ocr_res.startswith("ERROR:"):
+                    return ocr_res
+            except Exception:
+                pass
 
         if not text:
             return f"ERROR: Could not extract text from '{doc_name}'."
@@ -737,7 +763,7 @@ class EnhancedDocumentKit:
             "jurisdiction, key_clauses (list of {name, text, page}), payment_terms, "
             "obligations, risk_flags (list of {flag, severity, clause, recommendation}), "
             "termination_notice, dispute_resolution.\n\n"
-            f"=== DOCUMENT TEXT ===\n{text[:8000]}\n"
+            f"=== DOCUMENT TEXT ===\n{text[:60000]}\n"
         )
         try:
             from langchain_core.messages import HumanMessage
@@ -941,7 +967,7 @@ class EnhancedDocumentKit:
             "- financials: {subtotal, tax_amount, tax_rate, tip, total_amount}\n"
             "- expense_category: (e.g. Meals & Entertainment, Travel, Lodging, Office Supplies, Software, Utilities)\n"
             "- verification: {math_valid: boolean, notes: string}\n\n"
-            f"=== DOCUMENT TEXT ===\n{text[:8000]}\n"
+            f"=== DOCUMENT TEXT ===\n{text[:60000]}\n"
         )
         try:
             from langchain_core.messages import HumanMessage
