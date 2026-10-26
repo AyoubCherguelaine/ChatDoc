@@ -1,5 +1,5 @@
 """
-DocuChat Enterprise Python SDK Client.
+DOCTool Enterprise Python SDK Client.
 
 Provides synchronous and asynchronous methods to ingest documents,
 execute specialized AI agents, and query hybrid vector stores in B2B pipelines.
@@ -14,8 +14,8 @@ from typing import Any, Dict, List, Literal, Optional, Union
 import httpx
 
 
-class DocuChatError(Exception):
-    """Base exception for DocuChat SDK errors."""
+class DOCToolError(Exception):
+    """Base exception for DOCTool SDK errors."""
 
     def __init__(self, message: str, status_code: Optional[int] = None, details: Optional[Any] = None):
         super().__init__(message)
@@ -23,12 +23,16 @@ class DocuChatError(Exception):
         self.details = details
 
 
-class DocuChatClient:
+# Backwards compatibility alias
+DocuChatError = DOCToolError
+
+
+class DOCToolClient:
     """
-    Enterprise client for DocuChat SaaS API.
+    Enterprise client for DOCTool SaaS API.
 
     Example:
-    >>> client = DocuChatClient(api_key="docu_live_...")
+    >>> client = DOCToolClient(api_key="docu_live_...")
     >>> doc = client.upload_document("invoices/invoice_1024.pdf")
     >>> print("Uploaded doc ID:", doc["documentId"])
     >>> data = client.extract_invoice(doc["documentId"])
@@ -46,7 +50,7 @@ class DocuChatClient:
         self.timeout = timeout
         self.headers = {
             "X-API-Key": self.api_key,
-            "User-Agent": "DocuChat-Enterprise-SDK/1.0",
+            "User-Agent": "DOCTool-Enterprise-SDK/1.0",
         }
 
     def _request(
@@ -74,14 +78,14 @@ class DocuChatClient:
                         detail = err_json.get("detail", resp.text)
                     except Exception:
                         detail = resp.text
-                    raise DocuChatError(
-                        f"DocuChat API Error [{resp.status_code}]: {detail}",
+                    raise DOCToolError(
+                        f"DOCTool API Error [{resp.status_code}]: {detail}",
                         status_code=resp.status_code,
                         details=detail,
                     )
                 return resp.json()
         except httpx.RequestError as exc:
-            raise DocuChatError(f"Network transport error connecting to {url}: {exc}") from exc
+            raise DOCToolError(f"Network transport error connecting to {url}: {exc}") from exc
 
     def upload_document(
         self,
@@ -242,4 +246,8 @@ class DocuChatClient:
     def get_pricing(self) -> Dict[str, Any]:
         """Get service catalog and credit pricing."""
         return self._request("GET", "/api/v1/company/pricing")
+
+
+# Backwards compatibility alias
+DocuChatClient = DOCToolClient
 

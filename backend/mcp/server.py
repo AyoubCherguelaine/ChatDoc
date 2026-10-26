@@ -24,9 +24,9 @@ logger = logging.getLogger("docuchat.mcp")
 
 # Initialize MCP Server instance
 mcp_server = MCPServer(
-    name="DocuChat",
+    name="DOCTool",
     instructions=(
-        "DocuChat Enterprise Document Intelligence MCP Server. "
+        "DOCTool Enterprise Document Intelligence MCP Server. "
         "Provides tools to upload, search, query, and extract structured data "
         "from enterprise documents (invoices, contracts, compliance/PII scans, forms, summaries)."
     ),
@@ -585,7 +585,7 @@ def prompt_executive_summary(document_id: str) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="DocuChat Model Context Protocol (MCP) Server")
+    parser = argparse.ArgumentParser(description="DOCTool Model Context Protocol (MCP) Server")
     parser.add_argument(
         "--transport",
         choices=["stdio", "sse"],
@@ -594,8 +594,8 @@ def main():
     )
     parser.add_argument("--port", type=int, default=8001, help="Port for SSE transport")
     parser.add_argument("--host", default="127.0.0.1", help="Host for SSE transport")
-    parser.add_argument("--api-key", default=None, help="DocuChat Company API Key (docu_live_...)")
-    parser.add_argument("--base-url", default=None, help="Base URL of DocuChat server")
+    parser.add_argument("--api-key", default=None, help="DOCTool Company API Key (docu_live_...)")
+    parser.add_argument("--base-url", default=None, help="Base URL of DOCTool server")
 
     args = parser.parse_args()
 

@@ -1,7 +1,7 @@
 """
-Model Context Protocol (MCP) Server for DocuChat.
+Model Context Protocol (MCP) Server for DOCTool.
 
-Integrates DocuChat Document AI into Claude Desktop, Claude Code, Cursor,
+Integrates DOCTool Document AI into Claude Desktop, Claude Code, Cursor,
 and GPT chats via stdio and SSE transports.
 """
 

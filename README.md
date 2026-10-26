@@ -1,4 +1,4 @@
-# PDF Analyst — Chat with Your Documents
+# DOCTool — Intelligent Document AI & Chat Workspace
 
 A sophisticated RAG (Retrieval-Augmented Generation) system that lets you
 **chat with PDF documents** using either a classic conversational chain or a
