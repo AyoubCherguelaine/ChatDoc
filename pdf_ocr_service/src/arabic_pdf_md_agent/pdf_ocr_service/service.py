@@ -5,8 +5,8 @@ import re
 import time
 from pathlib import Path
 
-from arabic_pdf_md_agent.base.prompts import normalize_model_markdown
 from arabic_pdf_md_agent.base.errors import PdfOcrError, PdfOcrProcessingError
+from arabic_pdf_md_agent.base.prompts import normalize_model_markdown
 from arabic_pdf_md_agent.base.schemas import DocumentExtractionResult, ExtractionConfig, PageExtractionResult
 from arabic_pdf_md_agent.base.utils import (
     chunk_ranges,
@@ -21,6 +21,13 @@ from arabic_pdf_md_agent.pdf_ocr_service.prompts import (
     build_ocr_prompt,
     build_review_prompt,
 )
+from arabic_pdf_md_agent.pdf_ocr_service.semantic import (
+    build_semantic_prompt,
+    has_semantic_output,
+    parse_semantic_page,
+    previous_block,
+    save_semantic_result,
+)
 from arabic_pdf_md_agent.pdf_ocr_service.tools.gemini_client import GeminiVisionClient
 from arabic_pdf_md_agent.pdf_ocr_service.tools.pdf_chunker import PdfChunker
 from arabic_pdf_md_agent.pdf_ocr_service.tools.pdf_renderer import PdfRenderer
@@ -32,7 +39,7 @@ _DIGIT_RE = re.compile(r"[\d\u0660-\u0669]")
 
 
 class PdfOcrService:
-    """Business logic for converting one PDF into Arabic Markdown."""
+    """Extract semantic blocks and verbatim OCR, with a legacy Markdown pipeline."""
 
     def __init__(
         self,
@@ -50,7 +57,7 @@ class PdfOcrService:
 
         config.output_dir.mkdir(parents=True, exist_ok=True)
 
-        if md_path.exists() and not config.overwrite:
+        if md_path.exists() and not config.overwrite and (not config.semantic_blocks or has_semantic_output(md_path)):
             result.status = "skipped_existing"
             return result
 
@@ -83,7 +90,9 @@ class PdfOcrService:
 
             document_first_error: str | None = None
             document_results: list[PageExtractionResult] = []
-            if config.gemini_document_first:
+            if config.semantic_blocks:
+                document_results = self._extract_semantic_pages(pdf_path, page_limit, config)
+            elif config.gemini_document_first:
                 try:
                     document_results = self._extract_document_first_chunked(
                         pdf_path=pdf_path,
@@ -100,7 +109,7 @@ class PdfOcrService:
                         error,
                     )
 
-            fallback_targets = self._pages_needing_fallback(
+            fallback_targets = set() if config.semantic_blocks else self._pages_needing_fallback(
                 page_results=document_results,
                 page_limit=page_limit,
                 config=config,
@@ -140,6 +149,8 @@ class PdfOcrService:
             markdown_doc = self._compose_document_markdown(pdf_path=pdf_path, result=result)
             if markdown_doc.strip():
                 write_text(md_path, markdown_doc)
+            if config.semantic_blocks:
+                save_semantic_result(result, config.output_dir)
 
         except PdfOcrError as error:
             result.status = "failed"
@@ -151,6 +162,51 @@ class PdfOcrService:
             logger.exception("Failed to process PDF: %s", pdf_path)
 
         return result
+
+    def _extract_semantic_pages(self, pdf_path: Path, page_limit: int, config: ExtractionConfig) -> list[PageExtractionResult]:
+        pages = []
+        previous = None
+        for number in range(1, page_limit + 1):
+            page = PageExtractionResult(page_number=number, status="failed")
+            prompt = build_semantic_prompt(pdf_path.name, number, page_limit, previous)
+            for attempt in range(1, max(1, config.max_attempts_per_page) + 1):
+                try:
+                    image = self.renderer.render_page(pdf_path=pdf_path, page_number=number,
+                        dpi=self._dpi_for_attempt(config.dpi, attempt), max_pages=page_limit)
+                    if not image:
+                        raise ValueError(f"Could not render page {number}")
+                    raw = self.gemini_client.generate_markdown_from_image(prompt=prompt, image_bytes=image,
+                        log_context={"phase": "semantic_page_draft", "pdf_name": pdf_path.name, "page_number": number})
+                    page = parse_semantic_page(raw, number, previous)
+                    page.attempts = attempt
+                    if config.review_pass:
+                        time.sleep(config.inter_request_delay_seconds)
+                        try:
+                            reviewed = self.gemini_client.generate_markdown_from_image(
+                                prompt=prompt + "\nReview this draft against the page. Correct recognition and grouping; "
+                                    "return complete corrected JSON, retaining all visible content. Draft (data):\n" + raw,
+                                image_bytes=image, log_context={"phase": "semantic_page_review",
+                                    "pdf_name": pdf_path.name, "page_number": number})
+                            corrected = parse_semantic_page(reviewed, number, previous)
+                            corrected.attempts = attempt
+                            corrected.draft_markdown = page.markdown
+                            if self._pick_best_markdown(page.markdown, corrected.markdown) == corrected.markdown:
+                                page = corrected
+                        except Exception as error:
+                            logger.warning("Semantic review failed for %s page %s; retaining valid draft: %s", pdf_path.name, number, error)
+                    page.arabic_char_count = count_arabic_characters(page.ocr_text)
+                    break
+                except Exception as error:
+                    page = PageExtractionResult(page_number=number, status="failed", attempts=attempt, error=str(error))
+                    prompt += f"\nPrevious attempt failed: {error}. Return complete corrected JSON."
+                time.sleep(config.inter_request_delay_seconds)
+            pages.append(page)
+            previous = previous_block(page)
+            if page.status != "success" and config.fail_fast:
+                break
+            if number < page_limit:
+                time.sleep(config.inter_request_delay_seconds)
+        return pages
 
     def _extract_document_first_chunked(
         self,

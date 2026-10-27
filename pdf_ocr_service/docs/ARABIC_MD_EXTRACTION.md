@@ -4,7 +4,18 @@ This document explains how `pdf-llm-ocr` turns Arabic PDFs into Markdown. For
 installation and public API usage, start with the [README](../README.md) and
 [Python API reference](PYTHON_API.md).
 
-## OCR flow
+## Default semantic OCR flow
+
+The default pipeline renders pages sequentially and extracts free-form semantic
+blocks plus complete verbatim `ocr_text`. It writes Markdown and a semantic JSON
+sidecar. Each page receives the final meaningful block of its immediate predecessor
+to identify continuations. No image crops are generated. See the README for block
+fields, normalized coordinates, retries, and independent batch behavior.
+
+## Legacy Markdown-only flow
+
+The following document-first flow and fallback tuning apply when using
+`--legacy-markdown-only` or `semantic_blocks=False`.
 
 For each PDF, the library:
 

@@ -61,10 +61,10 @@ def ocr_pdf(
     model: str | None = None,
     **options: Any,
 ) -> DocumentExtractionResult:
-    """Convert one PDF to Markdown and return its detailed result.
+    """Convert one PDF to semantic JSON and Markdown and return its detailed result.
 
     ``options`` accepts any additional :class:`ExtractionConfig` field, such as
-    ``overwrite=True``, ``review_pass=False``, or ``dpi=300``.
+    ``overwrite=True``, ``review_pass=False``, ``semantic_blocks=False``, or ``dpi=300``.
     """
 
     pdf = Path(pdf_path)

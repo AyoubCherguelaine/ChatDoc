@@ -65,6 +65,15 @@ Frequently used optional fields:
 The `ExtractionConfig` dataclass is the source of truth for less common retry,
 quality, delay, and cost-estimation fields.
 
+## Semantic OCR
+
+`semantic_blocks=True` is the default. Results contain `blocks`, `block_count`,
+`ocr_text`, `coordinate_system`, and per-page equivalents in `page_results`.
+`json_path` points to the semantic JSON sidecar alongside the existing Markdown.
+Block `content` is free-form JSON; `ocr_text` is the complete visible transcription.
+Coordinates are normalized to 0–1000. Pass `semantic_blocks=False` for the legacy
+Markdown-only pipeline and its document-first/fallback options.
+
 ## Results
 
 `DocumentExtractionResult` includes paths, status, page counts, elapsed time,

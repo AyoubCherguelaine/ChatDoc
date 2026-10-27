@@ -604,6 +604,8 @@ def get_document_ocr_blocks(
             "filename": doc["original_filename"],
             "total_pages": data.get("total_pages", doc["page_count"] or 1),
             "page": page,
+            "ocr_text": data.get("ocr_text", ""),
+            "coordinate_system": data.get("coordinate_system", "normalized_0_1000"),
             "blocks": data.get("blocks", []),
             "pages": data.get("pages", []),
         }
@@ -666,6 +668,8 @@ def get_document_page_ocr_blocks(
             "language_detected": data.get("language_detected", language),
             "direction": data.get("direction", "rtl" if language == "ar" else "ltr"),
             "block_count": data.get("block_count", len(data.get("blocks", []))),
+            "ocr_text": data.get("ocr_text", ""),
+            "coordinate_system": data.get("coordinate_system", "normalized_0_1000"),
             "blocks": data.get("blocks", []),
         }
     except Exception as exc:

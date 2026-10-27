@@ -14,6 +14,7 @@ import {
   Menu,
   ChevronDown,
   Settings,
+  ScanText,
 } from "lucide-react";
 import { useState } from "react";
 import { Brand } from "@/components/brand";
@@ -29,6 +30,7 @@ export function Navbar() {
     { href: "/drive?view=documents", label: "All documents", icon: Files },
     { href: "/conversations", label: "Conversations", icon: MessageSquare },
     { href: "/services", label: "AI Services", icon: Bot },
+    { href: "/advanced-ocr", label: "Advanced OCR", icon: ScanText },
     { href: "/usage", label: "API & Credits", icon: Key },
   ];
   return (

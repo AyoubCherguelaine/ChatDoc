@@ -28,6 +28,7 @@ class BatchOcrConfig:
     poll_interval_seconds: int = 30
     run_id: str | None = None
     allow_partial: bool = False
+    semantic_blocks: bool = True
 
 
 @dataclass(frozen=True, slots=True)

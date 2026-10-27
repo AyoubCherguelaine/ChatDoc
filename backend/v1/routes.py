@@ -148,6 +148,13 @@ class OcrPageBlocksPayload(BaseModel):
     force_ocr: bool = Field(False, description="Force vision-based OCR re-extraction")
 
 
+class AdvancedOcrPayload(BaseModel):
+    document_id: str = Field(..., min_length=1, description="Uploaded PDF document ID")
+    start_page: int = Field(1, ge=1)
+    end_page: Optional[int] = Field(None, ge=1, description="Inclusive; defaults to the last page")
+    language: Literal["auto", "ar", "en", "mixed"] = "auto"
+
+
 # ---------------------------------------------------------------------------
 # Webhook Helper
 # ---------------------------------------------------------------------------
@@ -538,6 +545,40 @@ def _resolve_document_file_path(doc_id: str) -> tuple[Path, str]:
     return file_path, filename
 
 
+@router.post("/ocr/advanced", summary="Advanced OCR: Flexible Semantic Page Blocks", tags=["Advanced OCR"])
+def pipeline_advanced_ocr(
+    payload: AdvancedOcrPayload,
+    account: CompanyAccount = CompanyAuth,
+):
+    """Extract semantic blocks in page order with free-form content and continuation links.
+
+    Uses vision on each selected page, without generating image crops. At most
+    50 pages per request. The first selected page has no predecessor context.
+    """
+    from backend.agent.tools.advanced_ocr import AdvancedOcrService
+    from backend.agent.tools.ocr import OcrError
+
+    document = query(
+        "SELECT id, original_filename FROM docuchat.documents WHERE id = %s AND user_id = %s",
+        (payload.document_id, account.user_id), one=True,
+    )
+    if not document:
+        raise HTTPException(status_code=404, detail="Document not found")
+    if Path(document["original_filename"]).suffix.lower() != ".pdf":
+        raise HTTPException(status_code=422, detail="Advanced OCR requires a PDF document")
+    file_path, filename = _resolve_document_file_path(payload.document_id)
+    try:
+        data = AdvancedOcrService().extract(
+            file_path, start_page=payload.start_page, end_page=payload.end_page, language=payload.language,
+        )
+        return {**data, "status": "success", "document_id": payload.document_id, "filename": filename}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except OcrError as exc:
+        logger.warning("Advanced OCR failed for %s: %s", payload.document_id, exc)
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.get("/ocr/document/{doc_id}", summary="Extract Layout-Aware Document Blocks")
 def pipeline_get_document_ocr_blocks(
     doc_id: str,
@@ -564,6 +605,8 @@ def pipeline_get_document_ocr_blocks(
             "page": page,
             "language_detected": data.get("language_detected", language),
             "direction": data.get("direction", "rtl" if language == "ar" else "ltr"),
+            "ocr_text": data.get("ocr_text", ""),
+            "coordinate_system": data.get("coordinate_system", "normalized_0_1000"),
             "blocks": data.get("blocks", []),
             "pages": data.get("pages", []),
         }
@@ -618,6 +661,8 @@ def pipeline_post_page_ocr_blocks(
             "language_detected": data.get("language_detected", payload.language),
             "direction": data.get("direction", "rtl" if payload.language == "ar" else "ltr"),
             "block_count": data.get("block_count", len(data.get("blocks", []))),
+            "ocr_text": data.get("ocr_text", ""),
+            "coordinate_system": data.get("coordinate_system", "normalized_0_1000"),
             "blocks": data.get("blocks", []),
         }
     except Exception as exc:
@@ -656,6 +701,8 @@ def pipeline_get_page_ocr_blocks(
             "language_detected": data.get("language_detected", language),
             "direction": data.get("direction", "rtl" if language == "ar" else "ltr"),
             "block_count": data.get("block_count", len(data.get("blocks", []))),
+            "ocr_text": data.get("ocr_text", ""),
+            "coordinate_system": data.get("coordinate_system", "normalized_0_1000"),
             "blocks": data.get("blocks", []),
         }
     except Exception as exc:

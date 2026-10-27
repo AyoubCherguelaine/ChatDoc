@@ -145,6 +145,7 @@ class GeminiBatchUsageTests(unittest.TestCase):
             (input_dir / "rules.pdf").write_bytes(b"%PDF-test")
 
             config = BatchOcrConfig(
+                semantic_blocks=False,
                 input_dir=input_dir,
                 output_dir=output_dir,
                 api_key="test-key",
@@ -189,6 +190,7 @@ class GeminiBatchUsageTests(unittest.TestCase):
             other_pdf.write_bytes(b"%PDF-other")
 
             config = BatchOcrConfig(
+                semantic_blocks=False,
                 input_pdf=selected_pdf,
                 input_dir=input_dir,
                 output_dir=output_dir,
@@ -215,6 +217,7 @@ class GeminiBatchUsageTests(unittest.TestCase):
             (output_dir / "rules.md").write_text("already extracted", encoding="utf-8")
 
             config = BatchOcrConfig(
+                semantic_blocks=False,
                 input_pdf=selected_pdf,
                 input_dir=input_dir,
                 output_dir=output_dir,

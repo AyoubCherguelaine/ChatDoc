@@ -1,17 +1,61 @@
 # pdf-llm-ocr
 
-`pdf-llm-ocr` converts Arabic PDF documents into structured Markdown with Google
+`pdf-llm-ocr` converts Arabic PDF documents into semantic JSON and Markdown with Google
 Gemini. Install it from GitHub, run it as a command-line tool, or import it into
 another Python project. Gemini is the only supported provider in version `0.1.x`.
 
 ## Features
 
-- PDF-first OCR that retains document context and page boundaries.
-- Automatic page-image fallback for missing or weak pages.
+- Semantic page blocks with flexible `content` and complete verbatim `ocr_text`.
+- Sequential page OCR with continuation links and normalized block coordinates.
+- Legacy PDF-first Markdown OCR with automatic page-image fallback remains available.
 - Optional second Gemini review pass for transcription correction.
 - Single-file, directory, recursive, and asynchronous batch workflows.
 - JSON manifests and token/cost usage logs.
 - Stable `pdf_llm_ocr` Python API and `pdf-llm-ocr` command.
+
+## Semantic OCR output
+
+Semantic OCR is enabled by default for the CLI, Python API, and new batch runs.
+For each PDF the service writes `name.md`, `name.json`, and the existing
+`_manifests/name.json`. The Python result includes `json_path`, `blocks`,
+`block_count`, `ocr_text`, and `page_results`; each page has its own blocks and
+transcription. Markdown remains a readable rendering of the OCR transcription.
+
+Each block includes a stable `id`, free-form `type`, flexible JSON `content`,
+verbatim `ocr_text`, page number, reading order, and `bbox` on a normalized
+0–1000 canvas (`[left, top, right, bottom]`). Additional document-specific fields
+are retained. Visual descriptions belong in `content`; `ocr_text` contains only
+visible text. No image crops are produced.
+
+Standard OCR processes pages sequentially and passes the final meaningful block
+of the immediately preceding successful page as context. A continuation includes
+`continues_previous_block: true` and `previous_block_id`. Blank or failed pages
+reset that context. Independent block counts and JSON structure are validated;
+invalid output retries up to `max_attempts_per_page`. The optional review pass
+also validates JSON, retaining the valid draft if review fails.
+
+Batch pages run independently: they return semantic blocks and OCR text, with no
+cross-page continuation inference. The chosen mode is saved in the batch manifest
+so collection uses the format requested at preparation. Invalid semantic responses
+mark individual pages as failed while other results and usage records are retained.
+Old manifests without a mode continue to use Markdown parsing.
+
+Semantic mode uses page images; document-first/chunk options apply to legacy mode.
+To select the previous pipeline, use `--legacy-markdown-only` or pass
+`semantic_blocks=False` to `ocr_pdf`, `ocr_directory`, or `ExtractionConfig`.
+`BatchOcrConfig` accepts the same field. Existing Markdown without a successful
+semantic JSON sidecar is regenerated; complete pairs are skipped unless
+`--overwrite` is set. Failed or partial semantic output is eligible for reruns.
+
+```python
+from pdf_llm_ocr import ocr_pdf
+
+result = ocr_pdf("document.pdf", "output", review_pass=False)
+print(result.ocr_text)
+for block in result.blocks:
+    print(block["type"], block["content"], block["ocr_text"])
+```
 
 ## Requirements
 

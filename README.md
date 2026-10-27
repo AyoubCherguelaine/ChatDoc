@@ -990,6 +990,7 @@ matches = client.search(doc_id, query="Payment terms and late fees", top_k=3)
 | `GET` | `/api/v1/documents` | List company documents with pagination (`limit`, `offset`). |
 | `GET` | `/api/v1/documents/{id}` | Inspect document status, size, and page breakdown. |
 | `GET` | `/api/v1/documents/{id}/search` | Semantic embedding + BM25 keyword search with citations. |
+| `POST` | `/api/v1/ocr/advanced` | Vision-based semantic page blocks with flexible content, coordinates, and continuation links. |
 | `POST` | `/api/v1/pipeline/run` | Execute specialized AI agent (`invoice`, `contract`, `compliance`, `summary`, `form_parser`) with automated credit deduction and refund on error. Supports `webhook_url`. |
 | `POST` | `/api/v1/pipeline/jobs` | Submit asynchronous background pipeline job to Redis worker queue (returns `202 Accepted` + `jobId`). |
 | `GET` | `/api/v1/pipeline/jobs/{id}` | Poll background job progress (0-100) and structured output. |
@@ -1003,6 +1004,51 @@ matches = client.search(doc_id, query="Payment terms and late fees", top_k=3)
 | `GET` | `/api/v1/company/pricing` | Credit consumption rates per LLM tier. |
 
 ---
+
+### Advanced OCR: semantic page blocks
+
+Open **Advanced OCR** in the workspace navigation, select an uploaded PDF and
+an inclusive page range (up to 50 pages), then extract and download JSON.
+The API accepts either the normal Bearer session token or a company API key:
+
+```http
+POST /api/v1/ocr/advanced
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"document_id":"<uploaded-pdf-id>","start_page":1,"end_page":3,"language":"auto"}
+```
+
+The original OCR block endpoints and agent tools now use this same semantic
+engine by default, including PDFs with native text. Each block retains structured
+`content` and includes a separate `ocr_text` containing the full transcription.
+Pages and documents also include `ocr_text` assembled in reading order. Visual
+descriptions stay separate from visible text. Existing `metadata`, `title`,
+`table.content_md`, and `image` convenience fields remain available on the original
+endpoints. Coordinates now consistently use the normalized 0–1000 canvas,
+including `metadata.bbox`; clients previously expecting PDF points must adjust.
+`force_ocr` remains accepted for compatibility, and both values use vision.
+These endpoints therefore require a configured vision-capable model even for
+native PDFs. The standalone native extraction helper remains available in Python.
+
+This mode adapts `examy_ocr`'s semantic grouping, independent block count check,
+and previous-page reference idea. It uses the configured default vision-capable
+model on full rendered pages. It does not create image crops or use the old
+project's exam/question schemas. `content` accepts any JSON value and additional
+block fields are retained. `type`, `content`, `ocr_text`, and a normalized
+`bbox: [left, top, right, bottom]` in the range 0–1000 are required from the model.
+The service adds `id`, `page_number`, `reading_order`, and
+`continues_previous_block`; continuations also include `previous_block_id`.
+
+Pages are processed sequentially. Each receives only the last meaningful block
+of the immediately preceding selected page, excluding headers, footers, and
+side labels. The first selected page has no outside context. The response
+contains both `pages` and a flattened `blocks` list. A malformed response or
+block-count mismatch gets one retry; persistent extraction failures return 502,
+and invalid ranges or unsupported document types return 422. The request is
+synchronous, so clients and proxies need a timeout suitable for the page count.
+As with the existing OCR inspection endpoints, this endpoint does not deduct
+application credits; model provider usage still applies.
 
 ### 4. Bilingual (English & Arabic) Document Intelligence Suite
 

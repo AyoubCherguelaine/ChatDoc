@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from arabic_pdf_md_agent.base.prompts import normalize_model_markdown
-from arabic_pdf_md_agent.base.schemas import DocumentExtractionResult, PageExtractionResult, dataclass_to_json
+from arabic_pdf_md_agent.base.schemas import DocumentExtractionResult, PageExtractionResult
 from arabic_pdf_md_agent.base.utils import (
     count_arabic_characters,
     is_probably_pdf,
@@ -25,6 +25,12 @@ from arabic_pdf_md_agent.batch_ocr.schemas import BatchCollectSummary, BatchOcrC
 from arabic_pdf_md_agent.batch_ocr.usage_db import GeminiUsageStore
 from arabic_pdf_md_agent.pdf_ocr_service.db.manifest_store import ManifestStore
 from arabic_pdf_md_agent.pdf_ocr_service.prompts import build_ocr_prompt
+from arabic_pdf_md_agent.pdf_ocr_service.semantic import (
+    build_semantic_prompt,
+    has_semantic_output,
+    parse_semantic_page,
+    save_semantic_result,
+)
 from arabic_pdf_md_agent.pdf_ocr_service.service import PdfOcrService
 from arabic_pdf_md_agent.pdf_ocr_service.tools.pdf_renderer import PdfRenderer
 
@@ -67,6 +73,7 @@ class GeminiBatchOcrService:
             "updated_at": utc_now_iso(),
             "pages": [],
             "documents": [],
+            "semantic_blocks": config.semantic_blocks,
         }
 
         total_pages = 0
@@ -78,7 +85,7 @@ class GeminiBatchOcrService:
                 recursive=config.recursive,
             ):
                 md_path = config.output_dir / f"{safe_file_stem(pdf_path.stem)}.md"
-                if md_path.exists() and not config.overwrite:
+                if md_path.exists() and not config.overwrite and (not config.semantic_blocks or has_semantic_output(md_path)):
                     manifest["documents"].append(
                         {
                             "pdf_path": str(pdf_path),
@@ -393,6 +400,7 @@ class GeminiBatchOcrService:
             status = "failed"
             error = None
             markdown = ""
+            semantic_page = None
             usage = UsageRecord()
 
             if page.get("status") != "uploaded":
@@ -415,11 +423,19 @@ class GeminiBatchOcrService:
                         input_cost_usd_per_1m_tokens=config.input_cost_usd_per_1m_tokens,
                         output_cost_usd_per_1m_tokens=config.output_cost_usd_per_1m_tokens,
                     )
-                    markdown = normalize_model_markdown(self.extract_text_from_response(response)).strip()
-                    if markdown:
-                        status = "success"
-                    else:
-                        error = "Gemini batch response returned empty text or missing usage/content"
+                    try:
+                        raw = self.extract_text_from_response(response)
+                        if manifest.get("semantic_blocks", False):
+                            semantic_page = parse_semantic_page(raw, page_number)
+                            markdown = semantic_page.markdown
+                        else:
+                            markdown = normalize_model_markdown(raw).strip()
+                        if markdown or semantic_page is not None:
+                            status = "success"
+                        else:
+                            error = "Gemini batch response returned empty text or missing usage/content"
+                    except (ValueError, TypeError) as parse_error:
+                        error = f"Invalid semantic OCR response: {parse_error}"
 
             usage_store.upsert_page_usage(
                 run_id=str(manifest["run_id"]),
@@ -444,6 +460,9 @@ class GeminiBatchOcrService:
                     attempts=1,
                     error=error,
                     arabic_char_count=count_arabic_characters(markdown),
+                    ocr_text=semantic_page.ocr_text if semantic_page else "",
+                    blocks=semantic_page.blocks if semantic_page else [],
+                    block_count=semantic_page.block_count if semantic_page else 0,
                 )
             )
 
@@ -502,8 +521,10 @@ class GeminiBatchOcrService:
                 estimated_cost_usd=float(pdf_usage.get("estimated_cost_usd") or 0.0),
             )
             markdown_doc = PdfOcrService._compose_document_markdown(pdf_path=Path(pdf_path), result=result)
-            if result.md_path and (config.overwrite or not result.md_path.exists()):
+            if result.md_path and (manifest.get("semantic_blocks", False) or config.overwrite or not result.md_path.exists()):
                 write_text(result.md_path, markdown_doc)
+            if manifest.get("semantic_blocks", False):
+                save_semantic_result(result, config.output_dir)
             manifest_store.save_document(result)
 
         final_status = "collected" if terminal_state == "JOB_STATE_SUCCEEDED" else terminal_state
@@ -530,7 +551,8 @@ class GeminiBatchOcrService:
             for page in manifest.get("pages", []):
                 if page.get("status") != "uploaded":
                     continue
-                prompt = build_ocr_prompt(
+                prompt_builder = build_semantic_prompt if manifest.get("semantic_blocks", False) else build_ocr_prompt
+                prompt = prompt_builder(
                     pdf_name=Path(str(page["pdf_path"])).name,
                     page_number=int(page["page_number"]),
                     total_pages=int(page["total_pages"]),

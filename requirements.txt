@@ -17,6 +17,7 @@ minio>=7.2.0
 
 # PDF processing — PyMuPDF for perfect text quality + page-level access
 pymupdf>=1.24.0
+pypdfium2>=4.30.0
 
 # Fallback PDF parser
 pypdf>=4.2.0

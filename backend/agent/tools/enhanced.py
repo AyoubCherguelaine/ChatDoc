@@ -316,8 +316,8 @@ class EnhancedDocumentKit:
                 Tool(
                     name="ocr_extract_blocks",
                     description=(
-                        "Extract layout-aware blocks (text, title, metadata, tables with content_md, "
-                        "images with visual descriptions) from document pages."
+                        "Extract semantic document blocks with structured content, verbatim ocr_text, "
+                        "normalized coordinates, tables, visual descriptions, and cross-page continuation links."
                     ),
                     parameters={
                         "type": "object",
@@ -336,8 +336,8 @@ class EnhancedDocumentKit:
                 Tool(
                     name="ocr_page_blocks",
                     description=(
-                        "Extract bilingual Arabic and English layout blocks (titles, text, "
-                        "markdown tables with content_md, and images with descriptions) for a specific page number."
+                        "Extract bilingual semantic blocks with structured content and verbatim ocr_text "
+                        "for a specific page. Includes normalized coordinates, tables, and visual descriptions."
                     ),
                     parameters={
                         "type": "object",
@@ -978,7 +978,7 @@ class EnhancedDocumentKit:
     # ------------------------------------------------------------------
 
     def ocr_extract_blocks(self, doc_name: str, page_num: Optional[int] = None) -> str:
-        """Extract layout-aware blocks (text, title, metadata, tables with content_md, images with descriptions)."""
+        """Extract semantic blocks, full OCR transcription, and page continuation links."""
         doc = self._find_document(doc_name)
         if doc is None:
             return self._list_available_error()

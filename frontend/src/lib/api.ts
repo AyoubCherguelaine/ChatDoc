@@ -101,6 +101,43 @@ export function fetchDocuments() {
   return api<import("./types").Document[]>("/documents", { method: "GET" });
 }
 
+export interface SemanticOcrBlock {
+  id: string;
+  type: string;
+  content: unknown;
+  ocr_text: string;
+  bbox: [number, number, number, number];
+  page_number: number;
+  reading_order: number;
+  continues_previous_block: boolean;
+  previous_block_id?: string;
+  [field: string]: unknown;
+}
+
+export interface AdvancedOcrResult {
+  status: string;
+  filename: string;
+  total_pages: number;
+  processed_pages: number;
+  block_count: number;
+  coordinate_system: string;
+  ocr_text: string;
+  pages: { page_number: number; block_count: number; blocks: SemanticOcrBlock[] }[];
+  blocks: SemanticOcrBlock[];
+}
+
+export function extractAdvancedOcr(payload: {
+  document_id: string;
+  start_page: number;
+  end_page: number;
+  language: "auto" | "ar" | "en" | "mixed";
+}) {
+  return api<AdvancedOcrResult>("/v1/ocr/advanced", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function uploadDocument(file: File) {
   const form = new FormData();
   form.append("file", file);

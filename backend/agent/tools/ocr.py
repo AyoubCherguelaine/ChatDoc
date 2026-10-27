@@ -186,90 +186,6 @@ INVOICE_OCR_PROMPT = """You are an invoice data extraction engine. Analyse the i
 CONTRACT_OCR_PROMPT = """You are a contract analysis engine. Analyse the contract image and extract structured data. Return ONLY valid JSON. Include: parties (list of {name, address, email, role}), effective_date (ISO), expiration_date (ISO), renewal_terms, termination_notice, governing_law, jurisdiction, dispute_resolution, key_clauses (list of {name, text}), payment_terms, obligations, risk_flags (list of {flag, severity, clause, recommendation}). If a field is not visible, use null. Do not add any explanation outside the JSON."""
 
 
-BLOCK_OCR_PROMPT = """You are an advanced bilingual (Arabic & English) layout-aware Document OCR Engine.
-Analyze this document page and divide its content into structural layout blocks in correct reading order (Right-to-Left for Arabic, Left-to-Right for English).
-Preserve all Arabic characters, ligatures, diacritics, and Eastern/Western Arabic numerals accurately without reversing characters.
-
-Return ONLY a valid JSON object matching this schema:
-{
-  "page_number": 1,
-  "language_detected": "ar",
-  "direction": "rtl",
-  "blocks": [
-    {
-      "type": "title",
-      "content": "فاتورة ضريبية / TAX INVOICE",
-      "title": "فاتورة ضريبية / TAX INVOICE",
-      "metadata": {
-        "page_number": 1,
-        "language": "mixed",
-        "direction": "rtl",
-        "bbox": [50.0, 40.0, 250.0, 70.0],
-        "reading_order": 1,
-        "confidence": 0.99
-      }
-    },
-    {
-      "type": "text",
-      "content": "شركة الأفق للتجارة العامة - س.ت: 1010987654",
-      "metadata": {
-        "page_number": 1,
-        "language": "ar",
-        "direction": "rtl",
-        "bbox": [50.0, 80.0, 300.0, 110.0],
-        "reading_order": 2,
-        "confidence": 0.98
-      }
-    },
-    {
-      "type": "table",
-      "content": "| البند / Item | الكمية / Qty | السعر / Unit Price | المجموع / Total |\n|---|---|---|---|\n| ... | ... | ... | ... |",
-      "metadata": {
-        "page_number": 1,
-        "language": "mixed",
-        "direction": "rtl",
-        "bbox": [50.0, 120.0, 450.0, 220.0],
-        "reading_order": 3,
-        "confidence": 0.99
-      },
-      "table": {
-        "content_md": "| البند / Item | الكمية / Qty | السعر / Unit Price | المجموع / Total |\n|---|---|---|---|\n| ... | ... | ... | ... |",
-        "headers": ["البند / Item", "الكمية / Qty", "السعر / Unit Price", "المجموع / Total"],
-        "rows": [["...", "...", "...", "..."]],
-        "row_count": 1,
-        "col_count": 4
-      }
-    },
-    {
-      "type": "image",
-      "content": "[Image: ZATCA QR Code / شعار الشركة]",
-      "metadata": {
-        "page_number": 1,
-        "language": "ar",
-        "direction": "rtl",
-        "bbox": [50.0, 10.0, 120.0, 80.0],
-        "reading_order": 4,
-        "confidence": 0.95
-      },
-      "image": {
-        "description": "ZATCA cryptographic QR code stamp / Company official seal",
-        "ocr_text": "..."
-      }
-    }
-  ]
-}
-
-Block Rules:
-1. `type` must be one of: "title", "text", "table", "image", "header", "footer".
-2. For "title": provide both `title` and `content`.
-3. For "text": provide `content`.
-4. For "table": provide `table` containing `content_md` as standard GitHub Flavored Markdown table syntax.
-5. For "image": provide `image` containing `description` ("lil describe": concise visual summary) and any visible `ocr_text`.
-6. `metadata` must include `page_number`, `language` ("ar"|"en"|"mixed"), `direction` ("rtl"|"ltr"), `bbox` [x0, y0, x1, y1], `reading_order`, and `confidence`.
-7. Preserve Arabic and English spelling, tax IDs (15-digit ZATCA numbers), CRs, IBANs, and numeric decimals exactly as written.
-Return ONLY the JSON object. Do not wrap with extra explanation or conversational text.
-"""
-
 
 def detect_block_language(text: str) -> tuple[str, str]:
     """Detect whether block content is Arabic ('ar', 'rtl'), English ('en', 'ltr'), or Mixed ('mixed', 'rtl')."""
@@ -677,80 +593,6 @@ class OcrService:
                 logger.warning("Failed to process page %d: %s", page_num, exc)
         return first_result
 
-    def _ocr_page_blocks_with_vision(self, image_bytes: bytes, page_number: int) -> list[dict]:
-        """Use Vision LLM to extract layout blocks from a rendered page image."""
-        llm = self._ensure_llm()
-        b64 = self._image_to_base64(image_bytes)
-        try:
-            import json
-            import re
-            from langchain_core.messages import HumanMessage
-
-            msg = HumanMessage(
-                content=[
-                    {"type": "text", "text": BLOCK_OCR_PROMPT},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}},
-                ]
-            )
-            response = llm.invoke([msg])
-            text = response.content if hasattr(response, "content") else str(response)
-
-            cleaned = str(text).strip()
-            match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", cleaned)
-            if match:
-                cleaned = match.group(1).strip()
-
-            data = json.loads(cleaned)
-            blocks_raw = data.get("blocks", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
-
-            normalized_blocks: list[dict] = []
-            for idx, b in enumerate(blocks_raw, start=1):
-                if not isinstance(b, dict):
-                    continue
-                b_type = str(b.get("type", "text")).lower()
-                content = str(b.get("content", ""))
-                title = b.get("title")
-                meta = b.get("metadata", {})
-                if not isinstance(meta, dict):
-                    meta = {}
-                meta.setdefault("page_number", page_number)
-                meta.setdefault("reading_order", idx)
-                meta.setdefault("confidence", 0.98)
-                meta.setdefault("bbox", [0.0, 0.0, 0.0, 0.0])
-
-                if not meta.get("language") or not meta.get("direction"):
-                    c_lang, c_dir = detect_block_language(content)
-                    meta.setdefault("language", c_lang)
-                    meta.setdefault("direction", c_dir)
-
-                block_item: dict[str, Any] = {
-                    "type": b_type,
-                    "content": content,
-                    "metadata": meta,
-                }
-                if b_type == "title" or title:
-                    block_item["title"] = str(title or content)
-                    block_item["type"] = "title"
-                if b_type == "table" or "table" in b:
-                    tbl = b.get("table", {})
-                    if not isinstance(tbl, dict):
-                        tbl = {}
-                    if not tbl.get("content_md"):
-                        tbl["content_md"] = content
-                    block_item["table"] = tbl
-                if b_type == "image" or "image" in b:
-                    img = b.get("image", {})
-                    if not isinstance(img, dict):
-                        img = {}
-                    if not img.get("description"):
-                        img["description"] = content.replace("[Image:", "").replace("]", "").strip() or "Visual document element"
-                    block_item["image"] = img
-                normalized_blocks.append(block_item)
-            return normalized_blocks
-        except Exception as exc:
-            logger.warning("Vision OCR block extraction failed on page %d: %s", page_number, exc)
-            return []
-
     def ocr_read_page_blocks(
         self,
         pdf_path: Path,
@@ -758,50 +600,10 @@ class OcrService:
         language: str = "auto",
         force_ocr: bool = False,
     ) -> dict:
-        """Extract bilingual Arabic and English layout blocks for a specific page."""
-        pdf_path = Path(pdf_path)
-        blocks: list[dict] = []
-        if not force_ocr:
-            try:
-                blocks = extract_native_page_blocks(pdf_path, page_number, llm=self.llm)
-            except Exception as exc:
-                logger.debug("Native block extraction error on page %d: %s", page_number, exc)
-
-        # Fallback to vision OCR if native yielded sparse blocks, force_ocr is True,
-        # or if Arabic was requested but native extraction missed Arabic characters
-        has_arabic = any(b.get("metadata", {}).get("language") == "ar" for b in blocks)
-        should_use_vision = not blocks or force_ocr or (language == "ar" and not has_arabic)
-
-        if should_use_vision:
-            img_bytes = self.renderer.render_page(pdf_path, page_number, dpi=self.dpi)
-            if img_bytes:
-                vision_blocks = self._ocr_page_blocks_with_vision(img_bytes, page_number)
-                if vision_blocks:
-                    blocks = vision_blocks
-
-        # Compute page-level language & reading direction summary
-        ar_count = sum(1 for b in blocks if b.get("metadata", {}).get("language") == "ar")
-        en_count = sum(1 for b in blocks if b.get("metadata", {}).get("language") == "en")
-        if ar_count > en_count:
-            detected_page_lang = "ar"
-            detected_dir = "rtl"
-        elif en_count > ar_count:
-            detected_page_lang = "en"
-            detected_dir = "ltr"
-        elif (ar_count + en_count) > 0:
-            detected_page_lang = "mixed"
-            detected_dir = "rtl" if ar_count >= en_count else "ltr"
-        else:
-            detected_page_lang = "en"
-            detected_dir = "ltr"
-
-        return {
-            "page_number": page_number,
-            "language_detected": detected_page_lang,
-            "direction": detected_dir,
-            "block_count": len(blocks),
-            "blocks": blocks,
-        }
+        """Return semantic regions plus complete OCR transcription for one page."""
+        return self.ocr_extract_blocks(
+            pdf_path, page_number=page_number, language=language, force_ocr=force_ocr,
+        )["pages"][0]
 
     def ocr_extract_blocks(
         self,
@@ -810,42 +612,54 @@ class OcrService:
         language: str = "auto",
         force_ocr: bool = False,
     ) -> dict:
-        """Extract layout-aware blocks across page(s) with Arabic and English support."""
-        pdf_path = Path(pdf_path)
-        total_pages = self.renderer.page_count(pdf_path)
+        """Extract semantic structure and verbatim OCR using the shared vision engine.
 
+        ``force_ocr`` remains accepted for existing callers; semantic extraction
+        always reads the rendered page, including PDFs with a native text layer.
+        Coordinates use the shared normalized 0..1000 canvas.
+        """
+        from backend.agent.tools.advanced_ocr import AdvancedOcrService
+
+        engine = AdvancedOcrService(
+            llm=self.llm, renderer=self.renderer, dpi=self.dpi, max_pages=self.max_pages,
+        )
         if page_number is not None:
-            page_data = self.ocr_read_page_blocks(pdf_path, page_number, language=language, force_ocr=force_ocr)
-            return {
-                "document_name": pdf_path.name,
-                "total_pages": total_pages,
-                "page_number": page_number,
-                "language_detected": page_data.get("language_detected", "auto"),
-                "direction": page_data.get("direction", "ltr"),
-                "blocks": page_data["blocks"],
-                "pages": [page_data],
-            }
-
-        limit = min(total_pages, self.max_pages or 50)
-        pages_list: list[dict] = []
-        all_blocks: list[dict] = []
-        for p in range(1, limit + 1):
-            page_data = self.ocr_read_page_blocks(pdf_path, p, language=language, force_ocr=force_ocr)
-            pages_list.append(page_data)
-            all_blocks.extend(page_data["blocks"])
-
-        ar_total = sum(1 for b in all_blocks if b.get("metadata", {}).get("language") == "ar")
-        en_total = sum(1 for b in all_blocks if b.get("metadata", {}).get("language") == "en")
-        doc_lang = "ar" if ar_total > en_total else ("en" if en_total > ar_total else ("mixed" if (ar_total + en_total) > 0 else "en"))
-
-        return {
-            "document_name": pdf_path.name,
-            "total_pages": total_pages,
-            "language_detected": doc_lang,
-            "direction": "rtl" if doc_lang in ("ar", "mixed") else "ltr",
-            "pages": pages_list,
-            "blocks": all_blocks,
-        }
+            data = engine.extract(pdf_path, start_page=page_number, end_page=page_number, language=language)
+            data["page_number"] = page_number
+        else:
+            total = self.renderer.page_count(Path(pdf_path))
+            data = engine.extract(pdf_path, end_page=min(total, self.max_pages or 50), language=language)
+        self.llm = engine.llm
+        for page in data["pages"]:
+            for block in page["blocks"]:
+                detected, direction = detect_block_language(block["ocr_text"])
+                meta = block.get("metadata")
+                meta = dict(meta) if isinstance(meta, dict) else {}
+                meta.update(
+                    page_number=block["page_number"], reading_order=block["reading_order"],
+                    bbox=block["bbox"], coordinate_system=data["coordinate_system"],
+                    language=detected, direction=direction,
+                )
+                block["metadata"] = meta
+                # Retain the convenience fields consumed by existing clients.
+                if block["type"] == "title":
+                    block.setdefault("title", block["ocr_text"])
+                if block["type"] == "table":
+                    table = block.get("table")
+                    table = dict(table) if isinstance(table, dict) else {}
+                    table.setdefault("content_md", block["ocr_text"])
+                    block["table"] = table
+                if block["type"] == "image":
+                    image = block.get("image")
+                    image = dict(image) if isinstance(image, dict) else {}
+                    content = block["content"]
+                    description = content.get("description", "") if isinstance(content, dict) else content
+                    image.setdefault("description", description)
+                    image["ocr_text"] = block["ocr_text"]
+                    block["image"] = image
+            page["language_detected"], page["direction"] = detect_block_language(page["ocr_text"])
+        data["language_detected"], data["direction"] = detect_block_language(data["ocr_text"])
+        return data
 
 
 def extract_invoice_json(ocr_service: OcrService, pdf_path: Path) -> str:

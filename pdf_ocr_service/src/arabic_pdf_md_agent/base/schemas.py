@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
 import os
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +39,7 @@ class ExtractionConfig:
     input_cost_usd_per_1m_tokens: float = DEFAULT_INPUT_COST_USD_PER_1M_TOKENS
     output_cost_usd_per_1m_tokens: float = DEFAULT_OUTPUT_COST_USD_PER_1M_TOKENS
     cached_input_cost_usd_per_1m_tokens: float = 0.03
+    semantic_blocks: bool = True
 
 
 @dataclass(slots=True)
@@ -50,6 +51,10 @@ class PageExtractionResult:
     attempts: int = 0
     error: str | None = None
     arabic_char_count: int = 0
+    ocr_text: str = ""
+    blocks: list[dict[str, Any]] = field(default_factory=list)
+    coordinate_system: str = "normalized_0_1000"
+    block_count: int = 0
 
 
 @dataclass(slots=True)
@@ -67,6 +72,11 @@ class DocumentExtractionResult:
     estimated_cost_usd: float = 0.0
     page_results: list[PageExtractionResult] = field(default_factory=list)
     error: str | None = None
+    json_path: Path | None = None
+    ocr_text: str = ""
+    blocks: list[dict[str, Any]] = field(default_factory=list)
+    coordinate_system: str = "normalized_0_1000"
+    block_count: int = 0
 
 
 @dataclass(slots=True)

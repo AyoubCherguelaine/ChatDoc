@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 import time
 
-from arabic_pdf_md_agent.base.schemas import DocumentExtractionResult, ExtractionConfig, RunSummary
 from arabic_pdf_md_agent.base.errors import PdfOcrError
+from arabic_pdf_md_agent.base.schemas import DocumentExtractionResult, ExtractionConfig, RunSummary
 from arabic_pdf_md_agent.base.utils import resolve_pdf_inputs, safe_file_stem
 from arabic_pdf_md_agent.pdf_ocr_service.db.manifest_store import ManifestStore
 from arabic_pdf_md_agent.pdf_ocr_service.service import PdfOcrService
@@ -79,6 +79,10 @@ class PdfOcrDomainAgent:
                     8,
                 )
                 results.append(result)
+                if result.json_path is not None and result.status != "skipped_existing":
+                    from arabic_pdf_md_agent.pdf_ocr_service.semantic import save_semantic_result
+
+                    save_semantic_result(result, config.output_dir)
                 manifest_store.save_document(result)
                 logger.info(
                     "Finished PDF: %s status=%s elapsed_ms=%s model_calls=%s tokens=%s/%s cost_usd=%.6f",

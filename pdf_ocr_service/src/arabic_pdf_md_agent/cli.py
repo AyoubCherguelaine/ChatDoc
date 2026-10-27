@@ -53,6 +53,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=12,
         help="Pages per Gemini document-first chunk. Lower for large PDFs.",
     )
+    parser.add_argument("--legacy-markdown-only", action="store_true", help="Use the legacy Markdown-only OCR pipeline without semantic JSON.")
     parser.add_argument("--overwrite", action="store_true", help="Rewrite Markdown files even if they already exist.")
     parser.add_argument(
         "--disable-gemini-document-first",
@@ -110,6 +111,7 @@ def _add_batch_common_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--include-glob", default="*.pdf", help="Filename glob for selecting PDFs.")
     parser.add_argument("--recursive", action="store_true", help="Search for PDFs recursively in input dir.")
     parser.add_argument("--max-pages-per-pdf", type=int, default=None, help="Optional page cap per PDF.")
+    parser.add_argument("--legacy-markdown-only", action="store_true", help="Use the legacy Markdown-only OCR pipeline without semantic JSON.")
     parser.add_argument("--overwrite", action="store_true", help="Rewrite Markdown files even if they already exist.")
     parser.add_argument("--usage-db-path", type=Path, default=None, help="SQLite usage DB path. Defaults to <output-dir>/gemini_usage.sqlite3.")
     parser.add_argument(
@@ -188,6 +190,7 @@ def _batch_config_from_args(args: argparse.Namespace, parser: argparse.ArgumentP
         poll_interval_seconds=getattr(args, "poll_interval_seconds", 30),
         run_id=args.run_id,
         allow_partial=getattr(args, "allow_partial", False),
+        semantic_blocks=not args.legacy_markdown_only,
     )
 
 
@@ -298,6 +301,7 @@ def main(argv: list[str] | None = None) -> int:
             max_pages_per_pdf=args.max_pages_per_pdf,
             document_chunk_page_count=args.document_chunk_page_count,
             overwrite=args.overwrite,
+            semantic_blocks=not args.legacy_markdown_only,
             gemini_document_first=not args.disable_gemini_document_first,
             review_pass=not args.disable_review_pass,
             max_attempts_per_page=args.max_attempts_per_page,

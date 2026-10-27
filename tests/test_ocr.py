@@ -282,16 +282,19 @@ class TestOcrBlockExtraction:
         mock_llm = MagicMock()
         vision_json = json.dumps({
             "page_number": 1,
+            "block_count": 3,
             "blocks": [
                 {
                     "type": "title",
                     "content": "Official Report Header",
                     "title": "Official Report Header",
+                    "bbox": [50, 20, 300, 60],
                     "metadata": {"bbox": [50, 20, 300, 60], "reading_order": 1}
                 },
                 {
                     "type": "table",
                     "content": "| Item | Price |\n|---|---|\n| API Usage | $50 |",
+                    "bbox": [50, 100, 400, 200],
                     "metadata": {"bbox": [50, 100, 400, 200], "reading_order": 2},
                     "table": {
                         "content_md": "| Item | Price |\n|---|---|\n| API Usage | $50 |",
@@ -302,6 +305,7 @@ class TestOcrBlockExtraction:
                 {
                     "type": "image",
                     "content": "[Image: Corporate blue logo emblem]",
+                    "bbox": [50, 220, 120, 280],
                     "metadata": {"bbox": [50, 220, 120, 280], "reading_order": 3},
                     "image": {
                         "description": "Corporate blue logo emblem with verified crest",
@@ -370,7 +374,16 @@ class TestOcrBlockExtraction:
         doc.save(str(pdf_path))
         doc.close()
 
-        ocr_svc = OcrService()
+        renderer = MagicMock()
+        renderer.page_count.return_value = 1
+        renderer.render_page.return_value = b"png"
+        llm = MagicMock()
+        llm.invoke.return_value = MagicMock(content=json.dumps({
+            "block_count": 1,
+            "blocks": [{"type": "section", "content": "فاتورة / Invoice", "ocr_text": "فاتورة / Invoice",
+                        "bbox": [50, 50, 500, 100]}],
+        }))
+        ocr_svc = OcrService(llm=llm, renderer=renderer)
         res = ocr_svc.ocr_read_page_blocks(pdf_path, page_number=1, language="auto")
         assert res["page_number"] == 1
         assert "language_detected" in res

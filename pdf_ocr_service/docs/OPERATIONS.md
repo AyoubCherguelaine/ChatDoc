@@ -25,7 +25,7 @@ Batch OCR:
 - `src/arabic_pdf_md_agent/base/utils.py` resolves PDF inputs and output directories.
 
 2. OCR execution
-- `src/arabic_pdf_md_agent/pdf_ocr_service/service.py` runs the document-first and page-image OCR flow.
+- `src/arabic_pdf_md_agent/pdf_ocr_service/service.py` runs sequential semantic page OCR by default, or the legacy document-first and fallback flow with `--legacy-markdown-only`.
 - `src/arabic_pdf_md_agent/pdf_ocr_service/agent.py` coordinates rendering, prompting, and retries.
 
 3. Batch OCR
@@ -34,7 +34,8 @@ Batch OCR:
 
 4. Persistence
 - `src/arabic_pdf_md_agent/pdf_ocr_service/db/manifest_store.py` writes per-document manifests.
-- `output/arabic_md/*.md` stores the Markdown output.
+- `output/arabic_md/*.md` stores the Markdown transcription.
+- `output/arabic_md/*.json` stores semantic blocks and full OCR text; failed/partial sidecars do not suppress reruns.
 - `output/arabic_md/_manifests/*.json` stores document manifests.
 
 ## Failure Notes
