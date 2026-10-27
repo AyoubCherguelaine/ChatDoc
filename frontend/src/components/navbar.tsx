@@ -17,6 +17,8 @@ import {
   Users,
   Building,
   LayoutDashboard,
+  ScanText,
+  Bot,
   BookOpen,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
@@ -92,13 +94,13 @@ export function Navbar() {
     {
       href: "/advanced-ocr",
       label: "Advanced OCR",
-      icon: LayoutDashboard,
+      icon: ScanText,
       isActive: (p: string) => p.startsWith("/advanced-ocr"),
     },
     {
       href: "/services",
       label: "AI Services",
-      icon: LayoutDashboard,
+      icon: Bot,
       isActive: (p: string) => p.startsWith("/services"),
     },
   ];

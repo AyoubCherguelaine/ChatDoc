@@ -33,6 +33,8 @@ npm run build
 
 The Dockerfile creates a production standalone server running as an unprivileged user. Docker builds use `/api` for the browser and `http://backend:8000` for the server proxy. Both are Docker build arguments (`NEXT_PUBLIC_API_URL` and `BACKEND_URL`); changing either requires rebuilding the frontend. This works on EC2 without embedding the server IP or exposing backend port 8000 to browsers.
 
+The API proxy timeout is 10 minutes to allow long OCR requests to complete. Next.js otherwise defaults to 30 seconds, which can produce HTTP 500 with `socket hang up` in the frontend logs while the backend continues processing.
+
 From your EC2 project folder (for example, `doc tool`), apply the updated source and rebuild:
 
 ```bash
