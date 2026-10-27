@@ -34,6 +34,7 @@ import {
   FileCode,
   CheckCircle2,
   History,
+  BookOpen,
 } from "lucide-react";
 import {
   fetchPlaygroundPresets,
@@ -1134,6 +1135,13 @@ console.log("TTL Status:", status);`;
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href={`/docs?service=${serviceKey}`}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition shadow-sm"
+            >
+              <BookOpen size={14} />
+              <span>Full Platform Docs ↗</span>
+            </Link>
             <Link
               href="/usage"
               className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"

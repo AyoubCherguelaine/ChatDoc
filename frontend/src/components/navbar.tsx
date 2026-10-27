@@ -24,6 +24,7 @@ import {
   Users,
   Building,
   LayoutDashboard,
+  BookOpen,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Brand } from "@/components/brand";
@@ -35,7 +36,8 @@ function getPageTitle(pathname: string): string {
   if (pathname.startsWith("/overview")) return "Platform Overview";
   if (pathname.startsWith("/advanced-ocr")) return "Advanced OCR";
   if (pathname.startsWith("/services")) return "AI Services";
-  if (pathname.startsWith("/playground")) return "Playground & Docs";
+  if (pathname.startsWith("/docs")) return "Platform Documentation";
+  if (pathname.startsWith("/playground")) return "Playground Sandbox";
   if (pathname.startsWith("/usage")) return "Credits & Usage Logs";
   if (pathname.startsWith("/conversations")) return "Chats";
   if (pathname.startsWith("/chat")) return "Document Chat";
@@ -373,6 +375,20 @@ export function Navbar() {
           </p>
           <nav aria-label="Developer navigation" className="space-y-1">
             <Link
+              href="/docs"
+              onClick={() => setSidebarOpen(false)}
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-100",
+                pathname.startsWith("/docs") && "bg-[#e9f4ef] !text-[#087f74] font-semibold",
+              )}
+            >
+              <BookOpen size={16} />
+              <span>Platform Docs</span>
+              <span className="ml-auto rounded border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-teal-800">
+                DOCS
+              </span>
+            </Link>
+            <Link
               href="/playground"
               onClick={() => setSidebarOpen(false)}
               className={cn(
@@ -381,9 +397,9 @@ export function Navbar() {
               )}
             >
               <Code2 size={16} />
-              <span>Playground & Docs</span>
+              <span>Sandbox Demo</span>
               <span className="ml-auto rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-slate-600">
-                API
+                RUN
               </span>
             </Link>
             <Link

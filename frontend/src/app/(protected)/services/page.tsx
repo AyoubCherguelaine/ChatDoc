@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   FlaskConical,
   Code2,
+  BookOpen,
 } from "lucide-react";
 import { fetchDocuments, fetchCompanyAccount, type CompanyAccount } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -331,13 +332,20 @@ export default function ServicesPage() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
+              href="/docs"
+              className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
+            >
+              <BookOpen size={13} className="text-teal-600" />
+              <span>Platform Docs</span>
+            </Link>
+            <Link
               href="/usage"
-              className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-medium text-teal-800 hover:bg-teal-100 transition"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition"
             >
               <Key size={13} className="text-teal-600" />
               <span>
                 {account
-                  ? `${account.remainingCredits.toLocaleString()} / 1,200 Credits Available`
+                  ? `${account.remainingCredits.toLocaleString()} / 1,200 Credits`
                   : "1,200 Free Trial Credits"}
               </span>
             </Link>
@@ -461,12 +469,12 @@ export default function ServicesPage() {
                   <ArrowRight size={13} />
                 </Link>
                 <Link
-                  href={`/playground?service=${svc.id}&code=true`}
-                  title="View REST API code snippet"
-                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs transition"
+                  href={`/docs?service=${svc.id}`}
+                  title="View Platform REST API documentation"
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-teal-900 shadow-2xs transition"
                 >
                   <Code2 size={14} className="text-[#087f74]" />
-                  <span>API</span>
+                  <span>API Docs</span>
                 </Link>
               </div>
             </div>

@@ -1,9 +1,9 @@
 "use client";
 
-import { Suspense } from "react";
-import { usePathname } from "next/navigation";
+import { Suspense, useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Navbar } from "@/components/navbar";
-import { useRequireAuth } from "@/components/providers/session-provider";
+import { useSession } from "@/components/providers/session-provider";
 import { Spinner } from "@/components/ui/spinner";
 
 export default function ProtectedLayout({
@@ -11,11 +11,19 @@ export default function ProtectedLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, loading } = useRequireAuth();
+  const { user, loading } = useSession();
   const pathname = usePathname();
+  const router = useRouter();
   const isChat = pathname?.startsWith("/chat");
+  const isDocs = pathname?.startsWith("/docs");
 
-  if (loading || !user) {
+  useEffect(() => {
+    if (!isDocs && !loading && !user) {
+      router.replace("/login");
+    }
+  }, [isDocs, loading, user, router]);
+
+  if (!isDocs && (loading || !user)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-zinc-50 ">
         <Spinner size={24} />

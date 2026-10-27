@@ -420,7 +420,7 @@ export default function Home() {
                   Claim 1,200 Free Credits <ArrowRight size={16} />
                 </Link>
                 <Link
-                  href="/usage"
+                  href="/docs"
                   className="text-xs font-medium text-teal-200 hover:text-white transition"
                 >
                   View API pricing & documentation ↗
