@@ -13,7 +13,7 @@ FAISS (vector store) + PyMuPDF (page-level extraction) + **Hybrid RAG**
 
 ## Docker
 
-Run the full stack — PostgreSQL+pgvector, FastAPI backend, and the Next.js frontend — with a single command:
+Run the full stack — PostgreSQL+pgvector, Redis, SeaweedFS, FastAPI backend and worker, and the Next.js frontend — with a single command:
 
 ```bash
 cp .env-example .env      # add your OPENAI_API_KEY (and DB creds if you changed them)
@@ -26,8 +26,11 @@ docker compose up --build
 | Backend API | http://localhost:8000/api | `/api/docs` for OpenAPI UI, `/api/health` for production probes |
 | PostgreSQL (pgvector) | localhost:5436 | db `docuchat`, user `postgres`, password `docuchat123` |
 | Redis (Queue & Cache) | localhost:6379 | Distributed task queue, rate limiting & token bucket |
-| MinIO (Object Storage) | http://localhost:9000 | S3-compatible document storage (bucket `docuchat-documents`) |
-| MinIO Web Console | http://localhost:9001 | Web GUI (User: `minioadmin`, Pass: `minioadmin`) |
+| SeaweedFS (S3 Storage) | http://localhost:8333 | Private document bucket `docuchat-documents`; signed downloads |
+
+Documents use **SeaweedFS**, a dedicated S3-compatible object storage service on `http://localhost:8333`, with bucket `docuchat-documents`. Its public `chrislusf/seaweedfs` image requires no Docker registry login and is pinned to the tested digest (SeaweedFS 4.50). The `seaweedfs_data` volume persists object data and metadata. Set `S3_ACCESS_KEY`, `S3_SECRET_KEY`, and `S3_BUCKET` in `.env`; these are application storage credentials, not registry credentials. Backend and worker use `http://seaweedfs:8333` internally. `S3_PUBLIC_ENDPOINT_URL` must be reachable by the browser because download links are signed directly for that endpoint. Storage failures are surfaced instead of writing objects to a local fallback.
+
+To run the storage service without Docker, download the `weed` binary from the [SeaweedFS releases](https://github.com/seaweedfs/seaweedfs/releases) and run `AWS_ACCESS_KEY_ID=docuchat AWS_SECRET_ACCESS_KEY=docuchat-s3-development-secret S3_BUCKET=docuchat-documents weed mini -dir=./seaweed-data`. The Python app can connect using `S3_ENDPOINT_URL=http://localhost:8333`. Existing MinIO-only objects must be copied to the new bucket; the old volume is not deleted.
 
 > The database schema (`backend/schema.sql`) is created automatically on first `docker compose up` (the data volume is empty). Subsequent starts reuse the persisted `db_data` volume; to reset, run `docker compose down -v`.
 
@@ -996,8 +999,8 @@ matches = client.search(doc_id, query="Payment terms and late fees", top_k=3)
 | `GET` | `/api/v1/pipeline/jobs/{id}` | Poll background job progress (0-100) and structured output. |
 | `GET` | `/api/v1/pipeline/jobs` | List recent background pipeline jobs. |
 | `POST` | `/api/v1/pipeline/batch` | Execute batch multi-document workloads. |
-| `GET` | `/api/v1/storage/status` | MinIO object storage health, active bucket, and endpoint. |
-| `GET` | `/api/v1/storage/documents/{id}/presigned-url` | Generate secure MinIO presigned download/view URL. |
+| `GET` | `/api/v1/storage/status` | SeaweedFS S3 storage health, bucket, and endpoint. |
+| `GET` | `/api/v1/storage/documents/{id}/presigned-url` | Generate an expiring signed document download URL. |
 | `GET` | `/api/v1/gpt/openapi.json` | ChatGPT Custom GPT Actions OpenAPI 3.1 specification. |
 | `GET` | `/api/v1/openai/tools` | OpenAI function calling schema array. |
 | `GET` | `/api/v1/company/account` | Current trial credits (1,200 initial) and plan tier. |

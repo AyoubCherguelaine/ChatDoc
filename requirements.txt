@@ -13,7 +13,7 @@ mcp>=2.0.0
 
 # Production Infrastructure: Distributed Caching, Task Queues & Object Storage
 redis>=5.0.0
-minio>=7.2.0
+boto3>=1.35.0
 
 # PDF processing — PyMuPDF for perfect text quality + page-level access
 pymupdf>=1.24.0

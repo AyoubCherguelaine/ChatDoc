@@ -34,38 +34,25 @@ services:
       retries: 10
     restart: unless-stopped
 
-  minio:
-    image: minio/minio:latest
-    container_name: docuchat-minio
-    command: server /data --console-address ":9001"
+  seaweedfs:
+    image: chrislusf/seaweedfs@sha256:c2658820e763294a9e9de7b36c81e59b879e3459148351aee4e31a126ca64860
+    container_name: docuchat-seaweedfs
+    command: mini -dir=/data -ip=seaweedfs -ip.bind=0.0.0.0 -admin.ui=false -webdav=false
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:-docuchat}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:-docuchat-s3-development-secret}
+      S3_BUCKET: ${S3_BUCKET:-docuchat-documents}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "8333:8333"
     volumes:
-      - minio_data:/data
+      - seaweedfs_data:/data
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status && wget -q -O /dev/null http://127.0.0.1:8888/"]
       interval: 5s
-      timeout: 5s
-      retries: 10
+      timeout: 3s
+      retries: 30
+      start_period: 10s
     restart: unless-stopped
-
-  createbuckets:
-    image: minio/mc:latest
-    container_name: docuchat-minio-setup
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
-      /usr/bin/mc mb myminio/docuchat-documents || true;
-      /usr/bin/mc anonymous set download myminio/docuchat-documents || true;
-      exit 0;
-      "
 
   backend:
     build:
@@ -75,12 +62,13 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:docuchat123@db:5432/docuchat
       REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: docuchat-documents
-      MINIO_SECURE: "0"
-      STORAGE_BACKEND: auto
+      STORAGE_BACKEND: seaweedfs
+      S3_ENDPOINT_URL: http://seaweedfs:8333
+      S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:8333}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-docuchat}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-docuchat-s3-development-secret}
+      S3_BUCKET: ${S3_BUCKET:-docuchat-documents}
+      S3_REGION: ${S3_REGION:-us-east-1}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       CHAT_MODELS: ${CHAT_MODELS:-}
       DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-6-luna}
@@ -97,7 +85,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      seaweedfs:
         condition: service_healthy
     ports:
       - "8000:8000"
@@ -118,12 +106,13 @@ services:
     environment:
       DATABASE_URL: postgresql://postgres:docuchat123@db:5432/docuchat
       REDIS_URL: redis://redis:6379/0
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minioadmin
-      MINIO_BUCKET: docuchat-documents
-      MINIO_SECURE: "0"
-      STORAGE_BACKEND: auto
+      STORAGE_BACKEND: seaweedfs
+      S3_ENDPOINT_URL: http://seaweedfs:8333
+      S3_PUBLIC_ENDPOINT_URL: ${S3_PUBLIC_ENDPOINT_URL:-http://localhost:8333}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-docuchat}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-docuchat-s3-development-secret}
+      S3_BUCKET: ${S3_BUCKET:-docuchat-documents}
+      S3_REGION: ${S3_REGION:-us-east-1}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-6-luna}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
@@ -137,7 +126,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      seaweedfs:
         condition: service_healthy
     restart: unless-stopped
 
@@ -160,6 +149,6 @@ services:
 volumes:
   db_data:
   redis_data:
-  minio_data:
+  seaweedfs_data:
   uploads_data:
   indexes_data:

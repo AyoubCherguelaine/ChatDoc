@@ -1,6 +1,6 @@
 """
 Unit and Integration Tests for Production Infrastructure:
-- MinIO S3-Compatible Object Storage & Presigned URLs
+- SeaweedFS (S3-Compatible) Object Storage & Presigned URLs
 - Redis Distributed Job Queue & Rate Limiter
 - Asynchronous Background Pipeline Worker
 - Production Readiness Probes (/api/health)
@@ -19,7 +19,7 @@ from backend.billing import billing_service
 from backend.jobs.queue import RedisJobQueue, job_queue
 from backend.jobs.worker import execute_job_task
 from backend.sdk.client import DocuChatClient
-from backend.storage.minio import MinioStorageService
+from backend.storage import S3StorageService
 
 
 @pytest.fixture
@@ -34,14 +34,16 @@ def b2b_account():
 
 
 # ===========================================================================
-# 1. MinIO Object Storage Tests
+# 1. SeaweedFS Object Storage Tests
 # ===========================================================================
 
 
-def test_minio_storage_upload_and_retrieve():
+def test_s3_storage_upload_and_retrieve():
     """Test uploading and retrieving bytes via storage service."""
-    service = MinioStorageService()
-    test_content = b"Production MinIO Document Payload 2026"
+    service = S3StorageService()
+    if not service.is_healthy():
+        pytest.skip("SeaweedFS is not running")
+    test_content = b"Production SeaweedFS Document Payload 2026"
     obj_name = f"tests/doc_{uuid.uuid4().hex[:8]}.txt"
 
     uri = service.upload(obj_name, test_content)
@@ -60,14 +62,14 @@ def test_minio_storage_upload_and_retrieve():
 
 
 def test_storage_status_endpoint(client, b2b_account):
-    """Test /api/v1/storage/status reporting MinIO configuration."""
+    """Test /api/v1/storage/status reporting SeaweedFS configuration."""
     resp = client.get(
         "/api/v1/storage/status",
         headers={"X-API-Key": b2b_account.api_key},
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["provider"] == "MinIO (S3-Compatible)"
+    assert data["provider"] == "SeaweedFS (S3-Compatible)"
     assert "bucket" in data
     assert "storageBackend" in data
 
@@ -75,11 +77,13 @@ def test_storage_status_endpoint(client, b2b_account):
 def test_presigned_url_endpoint(client, b2b_account):
     """Test generating presigned document URL via API."""
     doc_id = str(uuid.uuid4())
-    resp = client.get(
-        f"/api/v1/storage/documents/{doc_id}/presigned-url",
-        headers={"X-API-Key": b2b_account.api_key},
-        params={"expires_seconds": 600},
-    )
+    from backend.v1.routes import storage_service
+    with patch.object(storage_service, "exists", return_value=True):
+        resp = client.get(
+            f"/api/v1/storage/documents/{doc_id}/presigned-url",
+            headers={"X-API-Key": b2b_account.api_key},
+            params={"expires_seconds": 600},
+        )
     assert resp.status_code == 200
     data = resp.json()
     assert data["documentId"] == doc_id
@@ -208,19 +212,19 @@ def test_execute_job_task_success(b2b_account):
 
 
 def test_production_health_check(client):
-    """Test /api/health returns full stack status (DB, Redis, MinIO, JobWorker)."""
+    """Test /api/health returns full stack status (DB, Redis, SeaweedFS, JobWorker)."""
     resp = client.get("/api/health")
     assert resp.status_code == 200
     data = resp.json()
     assert "database" in data
     assert "redis" in data
-    assert "minio" in data
+    assert "storage" in data
     assert data["jobWorker"] == "active"
     assert data["version"] == "1.0.0"
 
 
 def test_sdk_async_job_and_storage_methods():
-    """Test DocuChatClient async job and MinIO presigned URL methods."""
+    """Test DocuChatClient async job and SeaweedFS presigned URL methods."""
     sdk = DocuChatClient(api_key="docu_live_test_key")
 
     with patch.object(sdk, "_request") as mock_req:
@@ -232,6 +236,26 @@ def test_sdk_async_job_and_storage_methods():
         status_res = sdk.get_job_status("job_12345")
         assert status_res["status"] == "completed"
 
-        mock_req.return_value = {"url": "http://minio:9000/docuchat-documents/doc-1.pdf?token=xyz"}
+        mock_req.return_value = {"url": "/api/v1/storage/download/doc-1.pdf?expires=123&signature=xyz"}
         url = sdk.get_document_url("doc-1")
-        assert "token=xyz" in url
+        assert "signature=xyz" in url
+
+
+def test_signed_download_http_flow():
+    import httpx
+
+    service = S3StorageService()
+    if not service.is_healthy():
+        pytest.skip("SeaweedFS is not running")
+    name = f"tests/{uuid.uuid4().hex}/report with spaces.pdf"
+    try:
+        service.upload(name, b"%PDF-test-payload")
+        url = service.get_presigned_url(name)
+        response = httpx.get(url)
+        assert response.status_code == 200
+        assert response.content == b"%PDF-test-payload"
+        assert httpx.get(url.replace("X-Amz-Signature=", "X-Amz-Signature=forged")).status_code == 403
+        assert httpx.get(url.split("?")[0]).status_code == 403
+    finally:
+        service.delete(name)
+    assert httpx.get(url).status_code == 404

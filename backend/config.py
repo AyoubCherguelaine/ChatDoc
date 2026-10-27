@@ -34,13 +34,14 @@ class Settings:
     # Redis Distributed Cache & Queue
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
-    # MinIO S3-Compatible Object Storage
-    MINIO_ENDPOINT: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
-    MINIO_ACCESS_KEY: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
-    MINIO_SECRET_KEY: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
-    MINIO_BUCKET: str = os.getenv("MINIO_BUCKET", "docuchat-documents")
-    MINIO_SECURE: bool = os.getenv("MINIO_SECURE", "0") == "1"
-    STORAGE_BACKEND: str = os.getenv("STORAGE_BACKEND", "auto")  # minio, local, auto
+    # SeaweedFS S3 object storage. Public endpoint is used for browser links.
+    STORAGE_BACKEND: str = "seaweedfs"
+    S3_ENDPOINT_URL: str = os.getenv("S3_ENDPOINT_URL", "http://localhost:8333")
+    S3_PUBLIC_ENDPOINT_URL: str = os.getenv("S3_PUBLIC_ENDPOINT_URL", "http://localhost:8333")
+    S3_ACCESS_KEY: str = os.getenv("S3_ACCESS_KEY", "docuchat")
+    S3_SECRET_KEY: str = os.getenv("S3_SECRET_KEY", "docuchat-s3-development-secret")
+    S3_BUCKET: str = os.getenv("S3_BUCKET", "docuchat-documents")
+    S3_REGION: str = os.getenv("S3_REGION", "us-east-1")
 
     JWT_SECRET: str = os.getenv(
         "JWT_SECRET",

@@ -231,7 +231,7 @@ class DOCToolClient:
         return self._request("GET", "/api/v1/pipeline/jobs", params={"limit": limit})
 
     def get_document_url(self, document_id: str, expires_seconds: int = 3600) -> str:
-        """Get a secure MinIO presigned download/view URL for a document."""
+        """Get a secure expiring download/view URL for a document."""
         res = self._request(
             "GET",
             f"/api/v1/storage/documents/{document_id}/presigned-url",

@@ -1,8 +1,5 @@
-"""
-Object storage package supporting MinIO and local filesystem fallback.
-"""
+"""SeaweedFS S3 document storage."""
 
-from .minio import MinioStorageService, storage_service
+from .s3 import S3StorageService, storage_service
 
-__all__ = ["MinioStorageService", "storage_service"]
-
+__all__ = ["S3StorageService", "storage_service"]

@@ -146,11 +146,8 @@ def process_upload(user_id: str, file_path: Path, original_filename: str, file_s
     dest = doc_dir / original_filename
     try:
         shutil.copyfile(file_path, dest)
-        try:
-            from backend.storage import storage_service
-            storage_service.upload(f"documents/{doc_id}/{original_filename}", file_path)
-        except Exception:
-            pass
+        from backend.storage import storage_service
+        storage_service.upload(f"documents/{doc_id}/{original_filename}", file_path, content_type=mime)
         try:
             pdf_doc = load_document(dest)
         except ValueError:

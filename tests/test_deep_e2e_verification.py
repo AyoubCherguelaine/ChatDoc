@@ -5,7 +5,7 @@ Deeply tests:
 1. Real Bilingual (EN & AR) RAG Ingestion & Hybrid Vector Search
 2. Full Model Context Protocol (MCP) Tools, Resources, and Prompts Matrix
 3. High-Throughput Redis Job Queue, Rate Limiter & Async Worker Lifecycle
-4. MinIO Object Storage, Presigned URLs & Fallback Mechanisms
+4. SeaweedFS Object Storage & Signed URLs
 5. Bilingual Redaction, Classification, Financial Statement, and Forensic Anomaly Engine
 6. Cryptographic Webhook Security (HMAC-SHA256)
 7. Security Boundaries, Credit Deductions, and Automatic Refunds
@@ -31,7 +31,7 @@ from backend.jobs.queue import RedisJobQueue, job_queue
 from backend.jobs.worker import execute_job_task
 from backend.mcp.server import mcp_server
 from backend.sdk.client import DocuChatClient, DocuChatError
-from backend.storage.minio import MinioStorageService
+from backend.storage import S3StorageService
 
 
 @pytest.fixture
@@ -262,13 +262,15 @@ def test_deep_worker_execution_with_auto_refund(test_company):
 
 
 # ===========================================================================
-# 4. Deep MinIO Storage & Presigned URLs
+# 4. Deep SeaweedFS Storage & Presigned URLs
 # ===========================================================================
 
 
-def test_deep_minio_presigned_url_and_persistence(tmp_path):
+def test_deep_s3_presigned_url_and_persistence(tmp_path):
     """Test object upload, presigned URL generation, and download integrity."""
-    svc = MinioStorageService()
+    svc = S3StorageService()
+    if not svc.is_healthy():
+        pytest.skip("SeaweedFS is not running")
     test_pdf_bytes = b"%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\ntrailer\n<< /Root 1 0 R >>\n%%EOF"
     obj_name = f"documents/test_{uuid.uuid4().hex[:8]}/contract.pdf"
 

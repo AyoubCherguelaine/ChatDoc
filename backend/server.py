@@ -508,7 +508,7 @@ def chat(session_id: str, payload: ChatPayload, user: CurrentUser):
 
 @app.get("/api/health")
 def health():
-    """Health check endpoint: verifies DB, Redis, MinIO, and Worker readiness for production probes."""
+    """Health check endpoint: verifies DB, Redis, SeaweedFS, and Worker readiness for production probes."""
     db_status = "operational"
     try:
         query("SELECT 1", one=True)
@@ -517,13 +517,13 @@ def health():
         db_status = "degraded"
 
     redis_ok = job_queue.is_healthy()
-    minio_ok = storage_service.is_healthy()
+    storage_ok = storage_service.is_healthy()
 
     return {
         "status": "ok" if db_status == "operational" else "degraded",
         "database": db_status,
         "redis": "operational" if redis_ok else "fallback_in_memory",
-        "minio": "operational" if minio_ok else "fallback_local",
+        "storage": "operational" if storage_ok else "unavailable",
         "jobWorker": "active",
         "services": {
             s_id: "operational" for s_id in SERVICE_PRICING.keys()

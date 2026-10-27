@@ -1256,24 +1256,24 @@ def list_async_pipeline_jobs(
 
 
 # ---------------------------------------------------------------------------
-# MinIO Object Storage Endpoints
+# SeaweedFS S3 Storage Endpoints
 # ---------------------------------------------------------------------------
 
 
-@router.get("/storage/status", summary="Check MinIO Object Storage Status")
+@router.get("/storage/status", summary="Check SeaweedFS S3 Storage Status")
 def get_storage_status(account: CompanyAccount = CompanyAuth):
-    """Inspect MinIO object storage health, active bucket, and endpoint."""
+    """Inspect SeaweedFS S3 storage health."""
     healthy = storage_service.is_healthy()
     return {
-        "provider": "MinIO (S3-Compatible)",
-        "endpoint": settings.MINIO_ENDPOINT,
-        "bucket": settings.MINIO_BUCKET,
+        "provider": "SeaweedFS (S3-Compatible)",
+        "endpoint": storage_service.public_endpoint,
+        "bucket": storage_service.bucket,
         "isHealthy": healthy,
-        "storageBackend": "minio" if healthy else "local_fallback",
+        "storageBackend": "seaweedfs",
     }
 
 
-@router.get("/storage/documents/{doc_id}/presigned-url", summary="Generate MinIO Presigned URL")
+@router.get("/storage/documents/{doc_id}/presigned-url", summary="Generate Expiring Download URL")
 def get_document_presigned_url(
     doc_id: str,
     expires_seconds: int = Query(3600, ge=60, le=86400),
@@ -1288,6 +1288,10 @@ def get_document_presigned_url(
         fname = f"{doc_id}.pdf"
 
     object_name = f"documents/{doc_id}/{fname}"
+    # Publish existing ingestion files to the object store when first requested.
+    if not storage_service.exists(object_name):
+        source, _ = _resolve_document_file_path(doc_id)
+        storage_service.upload(object_name, source)
     url = storage_service.get_presigned_url(object_name, expires_seconds=expires_seconds)
     return {
         "documentId": doc_id,
