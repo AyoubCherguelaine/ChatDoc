@@ -44,8 +44,8 @@ export default function ProtectedWorkspaceError({
           asChild
           className="flex items-center justify-center gap-2"
         >
-          <Link href="/drive">
-            <LayoutDashboard size={15} /> Back to Overview
+          <Link href="/advanced-ocr">
+            <LayoutDashboard size={15} /> Back to Dashboard
           </Link>
         </Button>
       </div>

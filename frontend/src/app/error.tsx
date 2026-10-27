@@ -46,7 +46,7 @@ export default function GlobalError({
             asChild
             className="flex items-center justify-center gap-2"
           >
-            <Link href="/drive">
+            <Link href="/advanced-ocr">
               <Home size={15} /> Go to Dashboard
             </Link>
           </Button>

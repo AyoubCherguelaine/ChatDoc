@@ -411,7 +411,7 @@ export default function AdvancedOcrPage() {
           <FileCheck2 size={16} className="mt-0.5 shrink-0 text-teal-600" />
           <span>
             Processes up to 50 pages per run. Content adapts to your document layout, preserving reading
-            continuity across page breaks. No files are saved to user drive.
+            continuity across page breaks. Stateless Document AI processing — your files are processed ephemerally and never saved.
           </span>
         </div>
 

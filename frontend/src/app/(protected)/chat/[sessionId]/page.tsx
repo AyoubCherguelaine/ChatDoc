@@ -27,6 +27,7 @@ import {
   Bot,
   Settings2,
   ArrowUpRight,
+  Zap,
 } from "lucide-react";
 export default function ChatPage({
   params,
@@ -204,8 +205,8 @@ export default function ChatPage({
         <p className="text-sm text-rose-700">
           {error || "Conversation unavailable."}
         </p>
-        <Link href="/drive" className="mt-5 inline-block text-sm text-teal-700">
-          Return to documents
+        <Link href="/conversations" className="mt-5 inline-block text-sm text-teal-700">
+          Return to conversations
         </Link>
       </div>
     );
@@ -217,8 +218,8 @@ export default function ChatPage({
       <header className="mb-5 flex flex-wrap items-center justify-between gap-4">
         <div className="flex min-w-0 items-center gap-3">
           <Link
-            href="/drive"
-            aria-label="Back to documents"
+            href="/conversations"
+            aria-label="Back to conversations"
             className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500"
           >
             <ArrowLeft size={17} />
@@ -230,7 +231,15 @@ export default function ChatPage({
             </h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <Link
+            href="/usage"
+            title="Chat consumes 5 credits per response"
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
+          >
+            <Zap size={12} className="text-teal-600 fill-teal-600" />
+            <span>5 Credits / Response</span>
+          </Link>
           <Button
             variant="outline"
             size="sm"

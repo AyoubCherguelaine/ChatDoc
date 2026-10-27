@@ -29,6 +29,7 @@ class Settings:
 
     UPLOAD_DIR: str = os.getenv("UPLOAD_DIR", "backend/uploads")
     INDEX_DIR: str = os.getenv("INDEX_DIR", "backend/faiss_indexes")
+    DOC_TTL_MINUTES: int = int(os.getenv("DOC_TTL_MINUTES", "10"))
 
     # Redis Distributed Cache & Queue
     REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")

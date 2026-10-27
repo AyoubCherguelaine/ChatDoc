@@ -68,8 +68,8 @@ export function ServiceLauncherModal({
 }: ServiceLauncherModalProps) {
   const router = useRouter();
 
-  // Tab: 'drive' | 'upload'
-  const [sourceTab, setSourceTab] = useState<"drive" | "upload">("drive");
+  // Tab: 'upload'
+  const [sourceTab, setSourceTab] = useState<"drive" | "upload">("upload");
   const [selectedDocId, setSelectedDocId] = useState<string>("");
   const [searchFilter, setSearchFilter] = useState("");
 
@@ -149,7 +149,7 @@ export function ServiceLauncherModal({
       onDocumentAdded(newDoc);
       setSelectedDocId(newDoc.id);
       setLocalFile(null);
-      setSourceTab("drive");
+      setSourceTab("upload");
     } catch (err) {
       setUploadError(
         err instanceof ApiError ? err.message : "Upload failed. Please try again.",

@@ -14,6 +14,7 @@ from fastapi import (
     Depends,
     FastAPI,
     File,
+    Form,
     Header,
     HTTPException,
     Response,
@@ -173,7 +174,11 @@ def list_documents(user: CurrentUser):
 
 
 @app.post("/api/documents/upload")
-async def upload_document(user: CurrentUser, file: UploadFile = File(...)):
+async def upload_document(
+    user: CurrentUser,
+    file: UploadFile = File(...),
+    max_pages: Optional[int] = Form(None),
+):
     filename = Path((file.filename or "").replace("\\", "/")).name
     ext = Path(filename).suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
@@ -186,6 +191,23 @@ async def upload_document(user: CurrentUser, file: UploadFile = File(...)):
     if not raw or len(raw) > 25 * 1024 * 1024:
         raise HTTPException(413, "Choose a non-empty file up to 25 MB.")
     file_size = len(raw)
+
+    # Pre-validation for PDF page count limit if max_pages is specified
+    if ext == ".pdf" and max_pages is not None and max_pages > 0:
+        try:
+            import pypdf
+            reader = pypdf.PdfReader(io.BytesIO(raw))
+            pdf_page_count = len(reader.pages)
+            if pdf_page_count > max_pages:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"This document has {pdf_page_count} pages, which exceeds the maximum limit of {max_pages} pages for chat. Please upload a document with at most {max_pages} pages.",
+                )
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logging.debug("Pre-flight PDF page check skipped: %s", exc)
+
     suffix = ext
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(raw)
@@ -202,8 +224,25 @@ async def upload_document(user: CurrentUser, file: UploadFile = File(...)):
         )
         chunk_count, page_count = upload_result[0], upload_result[1]
         doc_id = getattr(upload_result, "document_id", None)
+
+        if max_pages is not None and max_pages > 0 and page_count > max_pages:
+            # Cleanup document
+            try:
+                from backend.db import get_conn
+                with get_conn() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("DELETE FROM docuchat.chunks WHERE document_id = %s", (doc_id,))
+                        cur.execute("DELETE FROM docuchat.documents WHERE id = %s", (doc_id,))
+            except Exception:
+                pass
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"This document has {page_count} pages, which exceeds the maximum limit of {max_pages} pages for chat. Please upload a document with at most {max_pages} pages.",
+            )
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         logging.exception("Document processing failed")
         raise HTTPException(500, "Processing failed. Check the file and model configuration, then try again.") from exc

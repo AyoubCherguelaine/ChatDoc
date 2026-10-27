@@ -106,38 +106,32 @@ def api_client(monkeypatch):
         yield client, routes
 
 
-def test_endpoint_ownership_and_payload_validation(api_client, monkeypatch):
-    client, routes = api_client
-    query = MagicMock(return_value=None)
-    monkeypatch.setattr(routes, "query", query)
-    assert client.post("/api/v1/ocr/advanced", json={"document_id": "other"}).status_code == 404
-    assert query.call_args.args[1] == ("other", "owner")
-    assert client.post("/api/v1/ocr/advanced", json={"document_id": "doc", "start_page": 0}).status_code == 422
+def test_endpoint_requires_file_upload(api_client):
+    client, _ = api_client
+    # Non-multipart or missing file returns 422
+    assert client.post("/api/v1/ocr/advanced", json={"document_id": "other"}).status_code == 422
+    assert client.post("/api/v1/ocr/advanced", data={"start_page": 1}).status_code == 422
 
 
-def test_endpoint_success(api_client, monkeypatch):
-    client, routes = api_client
-    monkeypatch.setattr(routes, "query", lambda *args, **kwargs: {"id": "doc", "original_filename": "test.pdf"})
-    extract = MagicMock(return_value={"pages": [], "blocks": [], "block_count": 0})
-    monkeypatch.setattr(AdvancedOcrService, "extract", extract)
-    result = client.post("/api/v1/ocr/advanced", json={"document_id": "doc", "start_page": 2, "end_page": 3, "language": "ar"})
-    assert result.status_code == 200
-    assert result.json()["status"] == "success"
-    extract.assert_called_once_with(Path("test.pdf"), start_page=2, end_page=3, language="ar")
+def test_endpoint_rejects_invalid_page_range(api_client):
+    client, _ = api_client
+    response = client.post(
+        "/api/v1/ocr/advanced",
+        files={"file": ("sample.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        data={"start_page": "0"},
+    )
+    assert response.status_code == 422
 
 
 @pytest.mark.parametrize("error,code", [(ValueError("invalid range"), 422), (OcrError("provider failed"), 502)])
 def test_endpoint_errors(api_client, monkeypatch, error, code):
     client, routes = api_client
-    monkeypatch.setattr(routes, "query", lambda *args, **kwargs: {"original_filename": "test.pdf"})
     monkeypatch.setattr(AdvancedOcrService, "extract", MagicMock(side_effect=error))
-    assert client.post("/api/v1/ocr/advanced", json={"document_id": "doc"}).status_code == code
-
-
-def test_endpoint_rejects_non_pdf(api_client, monkeypatch):
-    client, routes = api_client
-    monkeypatch.setattr(routes, "query", lambda *args, **kwargs: {"original_filename": "test.docx"})
-    assert client.post("/api/v1/ocr/advanced", json={"document_id": "doc"}).status_code == 422
+    response = client.post(
+        "/api/v1/ocr/advanced",
+        files={"file": ("sample.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+    )
+    assert response.status_code == code
 
 
 def test_endpoint_file_upload_success(api_client, monkeypatch):
@@ -160,10 +154,19 @@ def test_endpoint_file_upload_success(api_client, monkeypatch):
     data = response.json()
     assert data["status"] == "success"
     assert data["filename"] == "sample.pdf"
-    assert data["document_id"] is None
-    # Ensure ephemeral file was cleaned up
-    assert len(captured_paths) == 1
-    assert not captured_paths[0].exists()
+    assert data["document_id"] is not None
+    assert data["ttl_minutes"] == 10
+    assert data["remaining_seconds"] > 0
+
+    # Document stays active for 10 minutes and can be reused by document_id across services
+    doc_id = data["document_id"]
+    response2 = client.post(
+        "/api/v1/ocr/advanced",
+        json={"document_id": doc_id, "start_page": 1, "end_page": 2},
+    )
+    assert response2.status_code == 200
+    data2 = response2.json()
+    assert data2["document_id"] == doc_id
 
 
 def test_endpoint_file_upload_rejects_non_pdf(api_client):
@@ -228,3 +231,43 @@ def test_original_api_exposes_transcription(api_client, monkeypatch, path, body)
     assert response_value.status_code == 200
     assert response_value.json()["ocr_text"] == "Full OCR text"
     assert response_value.json()["coordinate_system"] == "normalized_0_1000"
+
+
+def test_ephemeral_document_ttl_and_multi_service(api_client, monkeypatch):
+    """Test 10-minute sliding window inactivity TTL and status check."""
+    from backend.storage.ephemeral import ephemeral_store
+    client, _ = api_client
+
+    monkeypatch.setattr(
+        AdvancedOcrService,
+        "extract",
+        MagicMock(return_value={"pages": [], "blocks": [], "block_count": 0}),
+    )
+
+    # Upload document
+    resp = client.post(
+        "/api/v1/ocr/advanced",
+        files={"file": ("invoice_ttl.pdf", b"%PDF-1.4 sample invoice", "application/pdf")},
+    )
+    assert resp.status_code == 200
+    doc_id = resp.json()["document_id"]
+    assert doc_id is not None
+    assert resp.json()["ttl_minutes"] == 10
+
+    # Status check returns active session and remaining seconds
+    status_resp = client.get(f"/api/v1/documents/{doc_id}/status")
+    assert status_resp.status_code == 200
+    status_data = status_resp.json()
+    assert status_data["status"] == "active"
+    assert status_data["documentId"] == doc_id
+    assert status_data["ttlMinutes"] == 10
+    assert status_data["remainingSeconds"] > 0
+
+    # Delete purges session
+    del_resp = client.delete(f"/api/v1/documents/{doc_id}")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["status"] == "success"
+
+    # Status check now returns 410 Gone
+    expired_resp = client.get(f"/api/v1/documents/{doc_id}/status")
+    assert expired_resp.status_code == 410

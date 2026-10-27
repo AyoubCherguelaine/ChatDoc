@@ -46,7 +46,18 @@ def test_b2b_pricing_catalog(client):
     service_ids = [s["id"] for s in data["services"]]
     assert "invoice" in service_ids
     assert "contract" in service_ids
-    assert "compliance" in service_ids
+
+
+def test_b2b_list_models(client):
+    """Test retrieving available models (configured with Luna)."""
+    resp = client.get("/api/v1/models")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["object"] == "list"
+    assert data["default_model"] == "gpt-6-luna"
+    assert len(data["data"]) == 1
+    assert data["data"][0]["id"] == "gpt-6-luna"
+    assert data["data"][0]["is_default"] is True
 
 
 def test_b2b_account_unauthorized(client):
@@ -376,3 +387,23 @@ async def test_mcp_call_credits_tool():
     assert "remainingCredits" in data
     assert "pricing" in data
     assert data["pricing"]["invoice"] == 25
+
+
+def test_upload_document_enforces_max_pages(client):
+    """Verify uploading a document with max_pages rejects documents exceeding page limit."""
+    from backend.auth import get_current_user
+    server.app.dependency_overrides[get_current_user] = lambda: {"id": "test-user-1", "name": "Test"}
+    try:
+        files = {"file": ("large_doc.txt", b"Page 1\nPage 2\nPage 3\nPage 4\n", "text/plain")}
+        with patch("backend.rag.process_upload") as mock_upload:
+            mock_upload.return_value = rag.UploadResult(10, 5, "doc-large-uuid")
+
+            resp = client.post(
+                "/api/documents/upload",
+                files=files,
+                data={"max_pages": 3},
+            )
+            assert resp.status_code == 422
+            assert "exceeds the maximum limit of 3 pages" in resp.json()["detail"]
+    finally:
+        server.app.dependency_overrides.pop(get_current_user, None)

@@ -27,7 +27,7 @@ function LoginForm() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (user) router.replace("/drive");
+    if (user) router.replace("/advanced-ocr");
   }, [user, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,7 +40,7 @@ function LoginForm() {
       } else {
         await register(name, email, password);
       }
-      router.replace("/drive");
+      router.replace("/advanced-ocr");
     } catch (err) {
       setError(
         err instanceof ApiError

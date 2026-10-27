@@ -25,6 +25,15 @@ import {
   ShieldCheck,
   Terminal,
   Zap,
+  Timer,
+  RefreshCw,
+  Database,
+  Server,
+  Key,
+  ChevronRight,
+  FileCode,
+  CheckCircle2,
+  History,
 } from "lucide-react";
 import {
   fetchPlaygroundPresets,
@@ -73,11 +82,20 @@ export default function PlaygroundPage() {
   const [configTab, setConfigTab] = useState<"schema" | "system">("schema");
   const [copied, setCopied] = useState<boolean>(false);
 
-  // API Code Modal States
-  const [showApiModal, setShowApiModal] = useState<boolean>(initialShowCode);
+  // API Code Documentation States
+  const [docEndpoint, setDocEndpoint] = useState<"pipeline" | "upload" | "ocr" | "status" | "multi_workflow">("pipeline");
+  const [docSubTab, setDocSubTab] = useState<"params" | "response" | "lifecycle">("params");
   const [apiModalTab, setApiModalTab] = useState<"curl" | "python" | "typescript" | "full_workflow">("curl");
   const [apiModalAsync, setApiModalAsync] = useState<boolean>(false);
   const [codeCopied, setCodeCopied] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (initialShowCode) {
+      setTimeout(() => {
+        document.getElementById("api-documentation")?.scrollIntoView({ behavior: "smooth" });
+      }, 300);
+    }
+  }, [initialShowCode]);
 
   // Load preset, documents, and company account
   useEffect(() => {
@@ -394,25 +412,192 @@ runDocumentPipeline().catch(console.error);`;
   }, [apiKey, serviceKey, sourceType, selectedDocId, textContent, schemaText, userPrompt, systemPrompt, apiModalAsync]);
 
   const workflowCode = useMemo(() => {
-    return `# End-to-End Enterprise Document AI Workflow:
-# Step 1: Ingest and OCR PDF/Scan
+    return `# ==============================================================================
+# DOC Tool — Multi-Service Document AI Workflow (10-Min Inactivity Sliding TTL)
+# ==============================================================================
+
+# [STEP 1] Ingest document once: returns documentId and sets 10-min countdown clock
 UPLOAD_RES=$(curl -s -X POST "http://localhost:8000/api/v1/documents/upload" \\
   -H "X-API-Key: ${apiKey}" \\
-  -F "file=@./invoice_or_contract.pdf")
+  -F "file=@./invoice_contract.pdf" \\
+  -F "ttl_minutes=10")
 
-DOCUMENT_ID=$(echo "$UPLOAD_RES" | jq -r '.id')
-echo "Ingested Document ID: $DOCUMENT_ID"
+DOCUMENT_ID=$(echo "$UPLOAD_RES" | jq -r '.documentId')
+echo "Session active: $DOCUMENT_ID (TTL: 10 minutes)"
 
-# Step 2: Trigger AI Pipeline (${serviceKey})
-curl -X POST "http://localhost:8000/api/v1/pipeline/run" \\
+# [STEP 2] Process Service 1: Advanced Semantic OCR (⚡ Resets inactivity timer to 10 min)
+curl -s -X POST "http://localhost:8000/api/v1/ocr/advanced" \\
   -H "X-API-Key: ${apiKey}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "service": "${serviceKey}",
+    "document_id": "'"$DOCUMENT_ID"'",
+    "start_page": 1,
+    "end_page": 5,
+    "language": "auto"
+  }' | jq .
+
+# [STEP 3] Process Service 2: Invoice Line Items Extraction (⚡ Resets inactivity timer to 10 min)
+curl -s -X POST "http://localhost:8000/api/v1/pipeline/run" \\
+  -H "X-API-Key: ${apiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "service": "${serviceKey || "invoice"}",
     "document_id": "'"$DOCUMENT_ID"'",
     "output_format": "json"
-  }' | jq .`;
+  }' | jq .
+
+# [STEP 4] Process Service 3: Executive Summary (⚡ Resets inactivity timer to 10 min)
+curl -s -X POST "http://localhost:8000/api/v1/pipeline/run" \\
+  -H "X-API-Key: ${apiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "service": "summary",
+    "document_id": "'"$DOCUMENT_ID"'",
+    "output_format": "json"
+  }' | jq .
+
+# [STEP 5] Check remaining TTL without modifying countdown
+curl -s -X GET "http://localhost:8000/api/v1/documents/'"$DOCUMENT_ID"'/status" \\
+  -H "X-API-Key: ${apiKey}" | jq .
+
+# Note: After 10 minutes without requests, files and index are automatically wiped.`;
   }, [apiKey, serviceKey]);
+
+  const activeCurlCode = useMemo(() => {
+    if (docEndpoint === "upload") {
+      return `# Ingest document once and initialize 10-minute sliding window session
+curl -X POST "http://localhost:8000/api/v1/documents/upload" \\
+  -H "X-API-Key: ${apiKey}" \\
+  -F "file=@./your_document.pdf" \\
+  -F "ttl_minutes=10"`;
+    }
+    if (docEndpoint === "ocr") {
+      return `# Run Advanced Semantic OCR with documentId (⚡ Resets 10-min window)
+curl -X POST "http://localhost:8000/api/v1/ocr/advanced" \\
+  -H "X-API-Key: ${apiKey}" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "document_id": "${selectedDocId || "YOUR_DOCUMENT_ID"}",
+    "start_page": 1,
+    "end_page": 5,
+    "language": "auto"
+  }'`;
+    }
+    if (docEndpoint === "status") {
+      return `# Check session remaining seconds and expiration timestamp
+curl -X GET "http://localhost:8000/api/v1/documents/${selectedDocId || "YOUR_DOCUMENT_ID"}/status" \\
+  -H "X-API-Key: ${apiKey}"`;
+    }
+    if (docEndpoint === "multi_workflow" || apiModalTab === "full_workflow") {
+      return workflowCode;
+    }
+    return curlCode;
+  }, [docEndpoint, apiModalTab, apiKey, selectedDocId, workflowCode, curlCode]);
+
+  const activePythonCode = useMemo(() => {
+    if (docEndpoint === "upload") {
+      return `import requests
+
+url = "http://localhost:8000/api/v1/documents/upload"
+headers = {"X-API-Key": "${apiKey}"}
+files = {"file": open("your_document.pdf", "rb")}
+data = {"ttl_minutes": 10}  # Inactivity sliding timeout
+
+resp = requests.post(url, headers=headers, files=files, data=data)
+data = resp.json()
+print("Document ID:", data["documentId"])
+print(f"Active for: {data['remainingSeconds']}s ({data['ttlMinutes']} min)")`;
+    }
+    if (docEndpoint === "ocr") {
+      return `import requests
+
+url = "http://localhost:8000/api/v1/ocr/advanced"
+headers = {
+    "X-API-Key": "${apiKey}",
+    "Content-Type": "application/json"
+}
+payload = {
+    "document_id": "${selectedDocId || "YOUR_DOCUMENT_ID"}",
+    "start_page": 1,
+    "end_page": 5,
+    "language": "auto"
+}
+
+resp = requests.post(url, headers=headers, json=payload)
+print("OCR Blocks:", resp.json().get("blocks"))
+print("TTL Renewed:", resp.json().get("remaining_seconds"), "seconds")`;
+    }
+    if (docEndpoint === "status") {
+      return `import requests
+
+url = "http://localhost:8000/api/v1/documents/${selectedDocId || "YOUR_DOCUMENT_ID"}/status"
+headers = {"X-API-Key": "${apiKey}"}
+
+resp = requests.get(url, headers=headers)
+print("Status:", resp.json())`;
+    }
+    if (docEndpoint === "multi_workflow" || apiModalTab === "full_workflow") {
+      return `# Complete Python Multi-Service Pipeline
+import requests
+
+API_KEY = "${apiKey}"
+BASE_URL = "http://localhost:8000/api/v1"
+headers = {"X-API-Key": API_KEY}
+
+# 1. Ingest PDF once (10 min sliding TTL)
+with open("invoice_sample.pdf", "rb") as f:
+    up = requests.post(f"{BASE_URL}/documents/upload", headers=headers, files={"file": f}, data={"ttl_minutes": 10}).json()
+
+doc_id = up["documentId"]
+print(f"Uploaded {doc_id}, expires in {up['remainingSeconds']}s")
+
+# 2. Run OCR (Resets 10 min clock)
+ocr_res = requests.post(f"{BASE_URL}/ocr/advanced", headers=headers, json={"document_id": doc_id, "start_page": 1}).json()
+print("OCR Page Blocks:", len(ocr_res.get("blocks", [])))
+
+# 3. Run Invoice extraction (Resets 10 min clock again!)
+inv_res = requests.post(f"{BASE_URL}/pipeline/run", headers=headers, json={"service": "invoice", "document_id": doc_id, "output_format": "json"}).json()
+print("Invoice Extracted:", inv_res.get("data"))
+
+# 4. Check remaining TTL
+status = requests.get(f"{BASE_URL}/documents/{doc_id}/status", headers=headers).json()
+print(f"Remaining seconds: {status['remainingSeconds']}s")`;
+    }
+    return pythonCode;
+  }, [docEndpoint, apiModalTab, apiKey, selectedDocId, pythonCode]);
+
+  const activeTypescriptCode = useMemo(() => {
+    if (docEndpoint === "upload") {
+      return `import FormData from "form-data";
+import fs from "fs";
+import fetch from "node-fetch";
+
+const form = new FormData();
+form.append("file", fs.createReadStream("./document.pdf"));
+form.append("ttl_minutes", "10");
+
+const res = await fetch("http://localhost:8000/api/v1/documents/upload", {
+  method: "POST",
+  headers: {
+    "X-API-Key": "${apiKey}",
+    ...form.getHeaders(),
+  },
+  body: form,
+});
+
+const session = await res.json();
+console.log("Active Session:", session.documentId);
+console.log("Expires in:", session.remainingSeconds, "seconds");`;
+    }
+    if (docEndpoint === "status") {
+      return `const res = await fetch("http://localhost:8000/api/v1/documents/${selectedDocId || "YOUR_DOCUMENT_ID"}/status", {
+  headers: { "X-API-Key": "${apiKey}" }
+});
+const status = await res.json();
+console.log("TTL Status:", status);`;
+    }
+    return typescriptCode;
+  }, [docEndpoint, apiKey, selectedDocId, typescriptCode]);
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
@@ -478,12 +663,14 @@ curl -X POST "http://localhost:8000/api/v1/pipeline/run" \\
             </span>
 
             <Button
-              onClick={() => setShowApiModal(true)}
+              onClick={() => {
+                document.getElementById("api-documentation")?.scrollIntoView({ behavior: "smooth" });
+              }}
               variant="outline"
               className="h-9 gap-1.5 border-slate-300 bg-white font-medium text-slate-700 hover:bg-slate-50 text-xs shadow-2xs"
             >
               <Code2 size={14} className="text-[#087f74]" />
-              <span>&lt;/&gt; Get API Code</span>
+              <span>&lt;/&gt; API Documentation &amp; Code ↓</span>
             </Button>
 
             <Button
@@ -968,185 +1155,598 @@ curl -X POST "http://localhost:8000/api/v1/pipeline/run" \\
         </div>
       </div>
 
-      {/* API Code Integration Modal */}
-      {showApiModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in duration-200"
-          onClick={() => setShowApiModal(false)}
-        >
-          <div
-            className="relative w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4 bg-slate-50/60">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 text-[#087f74]">
-                  <Code2 size={18} />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">
-                    Integrate {serviceTitle} API
-                  </h3>
-                  <p className="text-xs text-slate-500">
-                    Production REST endpoint with your current playground parameters and API key.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowApiModal(false)}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 transition"
-              >
-                <X size={18} />
-              </button>
+      {/* =========================================================================
+          INLINE DEVELOPER API DOCUMENTATION & INTERACTIVE CODE EXPLORER
+          Enhanced DOC Tool Developer Platform: Stateless with 10-min sliding TTL
+         ========================================================================= */}
+      <section
+        id="api-documentation"
+        className="mt-12 rounded-2xl border border-slate-200/90 bg-white p-6 md:p-8 shadow-sm space-y-8 scroll-mt-6"
+      >
+        {/* Section Header with Badges */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-100 pb-6">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-md bg-teal-100 px-2 py-0.5 text-[11px] font-bold text-teal-800 uppercase tracking-wide">
+                <Code2 size={13} /> DOC Tool REST API v1
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-900">
+                <Timer size={13} className="text-amber-700" /> 10-Min Sliding Inactivity Window
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-mono font-semibold text-slate-700">
+                Luna (gpt-6-luna)
+              </span>
+            </div>
+            <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
+              Developer API Documentation &amp; Pipeline Explorer
+            </h3>
+            <p className="text-xs text-slate-500 max-w-2xl leading-relaxed">
+              Upload your document once, obtain a <code className="text-teal-700 font-bold">documentId</code>, and chain multiple Document AI services within a 10-minute sliding inactivity window. Every request automatically resets the timer.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href="/usage"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
+            >
+              <Zap size={14} className="text-teal-600 fill-teal-600" />
+              <span>Usage Logs &amp; Quotas →</span>
+            </Link>
+          </div>
+        </div>
+
+        {/* 10-MINUTE SLIDING INACTIVITY TTL LIFECYCLE FLOWCHART */}
+        <div className="rounded-xl border border-teal-100 bg-gradient-to-r from-teal-50/70 via-slate-50/50 to-teal-50/40 p-5">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <RefreshCw size={15} className="text-teal-700 animate-spin-slow" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-teal-900">
+                How Ephemeral Document Sessions Work (Sliding TTL)
+              </h4>
+            </div>
+            <span className="text-[11px] text-teal-700 font-semibold font-mono">
+              Configurable: DOC_TTL_MINUTES=10
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 text-xs">
+            <div className="rounded-xl border border-white bg-white/90 p-3.5 shadow-2xs space-y-1 relative">
+              <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[10px] font-bold text-teal-800">
+                1
+              </span>
+              <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Upload size={14} className="text-teal-600" />
+                Upload Once
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Ingest PDF via <code className="font-mono text-teal-800">/documents/upload</code>. Receives <code className="font-mono text-slate-700">documentId</code> and starts 10-min countdown.
+              </p>
             </div>
 
-            {/* Modal Body */}
-            <div className="overflow-y-auto p-6 space-y-4 flex-1">
-              {/* Tab Selector & Mode Switch */}
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3">
-                <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-medium">
-                  <button
-                    onClick={() => setApiModalTab("curl")}
-                    className={`rounded-md px-3 py-1 transition ${
-                      apiModalTab === "curl"
-                        ? "bg-white text-slate-900 font-semibold shadow-2xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    cURL
-                  </button>
-                  <button
-                    onClick={() => setApiModalTab("python")}
-                    className={`rounded-md px-3 py-1 transition ${
-                      apiModalTab === "python"
-                        ? "bg-white text-slate-900 font-semibold shadow-2xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Python (requests)
-                  </button>
-                  <button
-                    onClick={() => setApiModalTab("typescript")}
-                    className={`rounded-md px-3 py-1 transition ${
-                      apiModalTab === "typescript"
-                        ? "bg-white text-slate-900 font-semibold shadow-2xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Node / TypeScript
-                  </button>
-                  <button
-                    onClick={() => setApiModalTab("full_workflow")}
-                    className={`rounded-md px-3 py-1 transition ${
-                      apiModalTab === "full_workflow"
-                        ? "bg-white text-slate-900 font-semibold shadow-2xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    Upload + Process
-                  </button>
-                </div>
-
-                {/* Async Toggle */}
-                {apiModalTab !== "full_workflow" && (
-                  <label className="flex items-center gap-2 cursor-pointer text-xs text-slate-700 select-none">
-                    <input
-                      type="checkbox"
-                      checked={apiModalAsync}
-                      onChange={(e) => setApiModalAsync(e.target.checked)}
-                      className="rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                    />
-                    <span className="font-medium">Async Background Job</span>
-                    <span className="text-[10px] text-slate-400 font-normal">
-                      (returns job_id immediately)
-                    </span>
-                  </label>
-                )}
-              </div>
-
-              {/* Code Snippet Container */}
-              <div className="relative rounded-xl border border-slate-800 bg-[#0b1320] p-4 text-xs font-mono text-emerald-400 shadow-inner">
-                <div className="absolute right-3 top-3">
-                  <button
-                    onClick={() => {
-                      const code =
-                        apiModalTab === "curl"
-                          ? curlCode
-                          : apiModalTab === "python"
-                          ? pythonCode
-                          : apiModalTab === "typescript"
-                          ? typescriptCode
-                          : workflowCode;
-                      handleCopyCode(code);
-                    }}
-                    className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/90 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:text-white transition"
-                  >
-                    {codeCopied ? (
-                      <>
-                        <Check size={13} className="text-emerald-400" />
-                        <span className="text-emerald-400">Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={13} />
-                        <span>Copy Code</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-
-                <pre className="max-h-80 overflow-auto pt-7 leading-relaxed whitespace-pre font-mono text-[12px] text-emerald-300">
-                  {apiModalTab === "curl" && curlCode}
-                  {apiModalTab === "python" && pythonCode}
-                  {apiModalTab === "typescript" && typescriptCode}
-                  {apiModalTab === "full_workflow" && workflowCode}
-                </pre>
-              </div>
-
-              {/* API Information Bar */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-xs">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1">
-                  <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-                    <ShieldCheck size={14} className="text-emerald-600" />
-                    <span>Authentication Header</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500 font-mono">
-                    X-API-Key: {account?.apiKeyPrefix || "docu_live_"}••••••••••
-                  </p>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 space-y-1">
-                  <div className="flex items-center gap-1.5 font-semibold text-slate-800">
-                    <Zap size={14} className="text-[#087f74]" />
-                    <span>Free Trial Credits</span>
-                  </div>
-                  <p className="text-[11px] text-slate-500">
-                    {account ? `${account.remainingCredits.toLocaleString()} credits remaining` : "1,200 starting credits included"}
-                  </p>
-                </div>
-              </div>
+            <div className="rounded-xl border border-white bg-white/90 p-3.5 shadow-2xs space-y-1 relative">
+              <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[10px] font-bold text-teal-800">
+                2
+              </span>
+              <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Zap size={14} className="text-teal-600 fill-teal-600" />
+                Run Service A
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Call OCR or Invoice extraction with <code className="font-mono text-slate-700">documentId</code>. <strong>Sliding reset:</strong> timer resets back to 10 minutes!
+              </p>
             </div>
 
-            {/* Modal Footer */}
-            <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/70 px-6 py-3.5 text-xs">
-              <Link
-                href="/usage"
-                className="flex items-center gap-1 font-semibold text-[#087f74] hover:underline"
-              >
-                <span>Manage API Keys &amp; View Quota in Usage</span>
-                <ExternalLink size={12} />
-              </Link>
-              <Button
-                onClick={() => setShowApiModal(false)}
-                className="bg-slate-900 text-white hover:bg-slate-800 font-semibold px-4 text-xs h-8"
-              >
-                Done
-              </Button>
+            <div className="rounded-xl border border-white bg-white/90 p-3.5 shadow-2xs space-y-1 relative">
+              <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-teal-100 text-[10px] font-bold text-teal-800">
+                3
+              </span>
+              <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                <Layers size={14} className="text-teal-600" />
+                Run Service B &amp; C
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                Chain Contracts, Compliance, or Summary. Reuses same document without re-uploading. Clock resets every time!
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-white bg-white/90 p-3.5 shadow-2xs space-y-1 relative">
+              <span className="absolute top-2.5 right-2.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-100 text-[10px] font-bold text-rose-800">
+                4
+              </span>
+              <p className="font-bold text-slate-900 flex items-center gap-1.5">
+                <ShieldCheck size={14} className="text-emerald-600" />
+                Zero-Trace Purge
+              </p>
+              <p className="text-[11px] text-slate-500 leading-relaxed">
+                After 10 continuous minutes without requests, files, embeddings, and buffers are purged permanently.
+              </p>
             </div>
           </div>
         </div>
-      )}
+
+        {/* INTERACTIVE ENDPOINT SELECTOR TABS */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+              Select API Endpoint
+            </span>
+            <span className="text-[11px] text-slate-400">
+              Active Service: <span className="font-semibold text-teal-700">{serviceTitle}</span>
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => {
+                setDocEndpoint("pipeline");
+                setApiModalTab("curl");
+              }}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                docEndpoint === "pipeline"
+                  ? "bg-slate-900 text-white shadow-md ring-2 ring-teal-500/20"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="rounded bg-teal-500/20 px-1.5 py-0.5 text-[10px] font-mono font-bold text-teal-400">
+                POST
+              </span>
+              <span>/api/v1/pipeline/run</span>
+              <span className="rounded bg-slate-800 px-1.5 py-0.2 text-[9px] text-slate-300">
+                19 Services
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setDocEndpoint("upload");
+                setApiModalTab("curl");
+              }}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                docEndpoint === "upload"
+                  ? "bg-slate-900 text-white shadow-md ring-2 ring-teal-500/20"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="rounded bg-teal-500/20 px-1.5 py-0.5 text-[10px] font-mono font-bold text-teal-400">
+                POST
+              </span>
+              <span>/api/v1/documents/upload</span>
+              <span className="rounded bg-teal-900/60 px-1.5 py-0.2 text-[9px] text-teal-200 font-mono">
+                10-Min Session
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setDocEndpoint("ocr");
+                setApiModalTab("curl");
+              }}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                docEndpoint === "ocr"
+                  ? "bg-slate-900 text-white shadow-md ring-2 ring-teal-500/20"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="rounded bg-teal-500/20 px-1.5 py-0.5 text-[10px] font-mono font-bold text-teal-400">
+                POST
+              </span>
+              <span>/api/v1/ocr/advanced</span>
+              <span className="rounded bg-slate-800 px-1.5 py-0.2 text-[9px] text-slate-300">
+                Layout Blocks
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setDocEndpoint("status");
+                setApiModalTab("curl");
+              }}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                docEndpoint === "status"
+                  ? "bg-slate-900 text-white shadow-md ring-2 ring-teal-500/20"
+                  : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+              }`}
+            >
+              <span className="rounded bg-sky-500/20 px-1.5 py-0.5 text-[10px] font-mono font-bold text-sky-400">
+                GET
+              </span>
+              <span>/api/v1/documents/:id/status</span>
+              <span className="rounded bg-slate-800 px-1.5 py-0.2 text-[9px] text-slate-300">
+                TTL Polling
+              </span>
+            </button>
+
+            <button
+              onClick={() => {
+                setDocEndpoint("multi_workflow");
+                setApiModalTab("full_workflow");
+              }}
+              className={`flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition ${
+                docEndpoint === "multi_workflow"
+                  ? "bg-[#087f74] text-white shadow-md"
+                  : "border border-teal-200 bg-teal-50/60 text-teal-900 hover:bg-teal-100/70"
+              }`}
+            >
+              <Zap size={13} className="text-teal-600 fill-teal-600" />
+              <span>Multi-Service Workflow Script</span>
+            </button>
+          </div>
+        </div>
+
+        {/* TWO-COLUMN EXPLORER: SPECS (LEFT) & CODE SANDBOX (RIGHT) */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* LEFT 6 COLS: DOCUMENTATION, PARAMETERS, & RESPONSE SCHEMAS */}
+          <div className="lg:col-span-6 flex flex-col space-y-4">
+            {/* Sub-Tabs: Parameters vs Response vs Error Codes */}
+            <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+              <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
+                <button
+                  onClick={() => setDocSubTab("params")}
+                  className={`rounded-md px-3 py-1 transition ${
+                    docSubTab === "params"
+                      ? "bg-white text-slate-900 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Request Parameters
+                </button>
+                <button
+                  onClick={() => setDocSubTab("response")}
+                  className={`rounded-md px-3 py-1 transition ${
+                    docSubTab === "response"
+                      ? "bg-white text-slate-900 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Response Schema
+                </button>
+                <button
+                  onClick={() => setDocSubTab("lifecycle")}
+                  className={`rounded-md px-3 py-1 transition ${
+                    docSubTab === "lifecycle"
+                      ? "bg-white text-slate-900 shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Status &amp; Errors
+                </button>
+              </div>
+
+              <span className="text-[11px] font-mono text-slate-400">
+                Content-Type: {docEndpoint === "upload" ? "multipart/form-data" : "application/json"}
+              </span>
+            </div>
+
+            {/* SubTab 1: Request Parameters Table */}
+            {docSubTab === "params" && (
+              <div className="overflow-x-auto rounded-xl border border-slate-200 bg-slate-50/50">
+                <table className="w-full text-left text-xs">
+                  <thead className="border-b border-slate-200 bg-slate-100/70 text-[11px] font-bold uppercase text-slate-500">
+                    <tr>
+                      <th className="px-3.5 py-2.5">Field</th>
+                      <th className="px-3.5 py-2.5">Type &amp; In</th>
+                      <th className="px-3.5 py-2.5">Required</th>
+                      <th className="px-3.5 py-2.5">Description</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/70 bg-white">
+                    <tr className="hover:bg-slate-50/50">
+                      <td className="px-3.5 py-2 font-mono font-bold text-slate-900">X-API-Key</td>
+                      <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (header)</td>
+                      <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                      <td className="px-3.5 py-2 text-slate-600 text-[11px]">Enterprise company API key.</td>
+                    </tr>
+
+                    {docEndpoint === "upload" && (
+                      <>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2 font-mono font-bold text-slate-900">file</td>
+                          <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">binary (form)</td>
+                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">PDF or document (up to 50 MB).</td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2 font-mono font-bold text-slate-900">ttl_minutes</td>
+                          <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">integer (form)</td>
+                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">Optional (10)</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">Sliding inactivity window in minutes.</td>
+                        </tr>
+                      </>
+                    )}
+
+                    {docEndpoint === "pipeline" && (
+                      <>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2 font-mono font-bold text-slate-900">service</td>
+                          <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
+                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">
+                            Target AI pipeline (e.g. <code className="text-teal-700">{serviceKey}</code>, <code>contract</code>, <code>compliance</code>).
+                          </td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2 font-mono font-bold text-slate-900">document_id</td>
+                          <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
+                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">
+                            Target session ID. <strong>⚡ Resets 10-minute inactivity timer.</strong>
+                          </td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2 font-mono font-bold text-slate-900">output_format</td>
+                          <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
+                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">Optional</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">Defaults to <code>"json"</code>.</td>
+                        </tr>
+                      </>
+                    )}
+
+                    {docEndpoint === "ocr" && (
+                      <>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2 font-mono font-bold text-slate-900">document_id</td>
+                          <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
+                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">Or file</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">Active session ID. Resets 10-minute timer.</td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2 font-mono font-bold text-slate-900">start_page</td>
+                          <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">integer (body)</td>
+                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">Optional (1)</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">1-indexed starting page.</td>
+                        </tr>
+                        <tr className="hover:bg-slate-50/50">
+                          <td className="px-3.5 py-2 font-mono font-bold text-slate-900">language</td>
+                          <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
+                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">Optional</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]"><code>auto</code>, <code>ar</code>, <code>en</code>, or <code>mixed</code>.</td>
+                        </tr>
+                      </>
+                    )}
+
+                    {docEndpoint === "status" && (
+                      <tr className="hover:bg-slate-50/50">
+                        <td className="px-3.5 py-2 font-mono font-bold text-slate-900">id</td>
+                        <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">path param</td>
+                        <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                        <td className="px-3.5 py-2 text-slate-600 text-[11px]">The documentId to inspect.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {/* SubTab 2: Response Schema Preview */}
+            {docSubTab === "response" && (
+              <div className="rounded-xl border border-slate-800 bg-[#0c1222] p-4 font-mono text-[11px] leading-relaxed text-emerald-400 shadow-inner overflow-auto max-h-72">
+                <pre>{docEndpoint === "upload" ? `{
+  "status": "success",
+  "documentId": "4b7d11dd-fc1d-4d5b-aec4-9b0c7239ea17",
+  "filename": "invoice_sample.pdf",
+  "fileSize": 1048576,
+  "pageCount": 4,
+  "chunkCount": 12,
+  "ttlMinutes": 10,
+  "remainingSeconds": 600,
+  "expiresAt": "2026-10-27T16:05:00Z",
+  "creditsRemaining": 1175,
+  "message": "Document session active. Retained for 10 minutes without usage."
+}` : docEndpoint === "status" ? `{
+  "status": "active",
+  "documentId": "4b7d11dd-fc1d-4d5b-aec4-9b0c7239ea17",
+  "filename": "invoice_sample.pdf",
+  "ttlMinutes": 10,
+  "remainingSeconds": 482,
+  "isExpired": false,
+  "expiresAt": "2026-10-27T16:05:00Z"
+}` : `{
+  "status": "success",
+  "service": "${serviceKey}",
+  "documentId": "${selectedDocId || "4b7d11dd-fc1d-4d5b-aec4-9b0c7239ea17"}",
+  "creditsDeducted": 25,
+  "creditsRemaining": 1150,
+  "ttlMinutes": 10,
+  "remainingSeconds": 600,
+  "expiresAt": "2026-10-27T16:15:00Z",
+  "data": {
+    "vendor": "Global Tech Corp",
+    "invoice_number": "INV-2026-991",
+    "total": 4500.00,
+    "line_items": [...]
+  }
+}`}</pre>
+              </div>
+            )}
+
+            {/* SubTab 3: Status Codes & Error Handling */}
+            {docSubTab === "lifecycle" && (
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 text-xs">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-emerald-900 font-mono">
+                    <span className="rounded bg-emerald-200 px-1.5 py-0.2 text-[10px]">200 OK</span>
+                    <span>Success</span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800 leading-snug">
+                    Processed successfully. Sliding inactivity timer renewed for 10 minutes.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-900 font-mono">
+                    <span className="rounded bg-amber-200 px-1.5 py-0.2 text-[10px]">410 GONE</span>
+                    <span>Session Expired</span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 leading-snug">
+                    Document inactive for &gt;10 min. Automatically purged. Upload new PDF.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-rose-200 bg-rose-50/60 p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-rose-900 font-mono">
+                    <span className="rounded bg-rose-200 px-1.5 py-0.2 text-[10px]">402 PAYMENT</span>
+                    <span>Credits Needed</span>
+                  </div>
+                  <p className="text-[11px] text-rose-800 leading-snug">
+                    Insufficient credit quota. Top up credits or request tier upgrade.
+                  </p>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-0.5">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-800 font-mono">
+                    <span className="rounded bg-slate-200 px-1.5 py-0.2 text-[10px]">422 UNPROCESSABLE</span>
+                    <span>Invalid Input</span>
+                  </div>
+                  <p className="text-[11px] text-slate-600 leading-snug">
+                    Invalid PDF or corrupt range. Double check start_page and end_page.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT 6 COLS: CODE GENERATOR & COPY BOX */}
+          <div className="lg:col-span-6 flex flex-col space-y-3">
+            {/* Language Switcher Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex rounded-xl border border-slate-200 bg-slate-100 p-1 text-xs font-semibold">
+                <button
+                  onClick={() => setApiModalTab("curl")}
+                  className={`rounded-lg px-3 py-1.5 transition ${
+                    apiModalTab === "curl"
+                      ? "bg-white text-slate-900 font-bold shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  cURL
+                </button>
+                <button
+                  onClick={() => setApiModalTab("python")}
+                  className={`rounded-lg px-3 py-1.5 transition ${
+                    apiModalTab === "python"
+                      ? "bg-white text-slate-900 font-bold shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Python
+                </button>
+                <button
+                  onClick={() => setApiModalTab("typescript")}
+                  className={`rounded-lg px-3 py-1.5 transition ${
+                    apiModalTab === "typescript"
+                      ? "bg-white text-slate-900 font-bold shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Node / TS
+                </button>
+                <button
+                  onClick={() => {
+                    setApiModalTab("full_workflow");
+                    setDocEndpoint("multi_workflow");
+                  }}
+                  className={`rounded-lg px-3 py-1.5 transition ${
+                    apiModalTab === "full_workflow"
+                      ? "bg-white text-teal-800 font-bold shadow-2xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  Multi-Service Script
+                </button>
+              </div>
+
+              {/* Copy Code Button */}
+              <button
+                onClick={() => {
+                  const code =
+                    apiModalTab === "curl"
+                      ? activeCurlCode
+                      : apiModalTab === "python"
+                      ? activePythonCode
+                      : apiModalTab === "typescript"
+                      ? activeTypescriptCode
+                      : workflowCode;
+                  handleCopyCode(code);
+                }}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:bg-slate-800 hover:text-white transition shadow-sm"
+              >
+                {codeCopied ? (
+                  <>
+                    <Check size={13} className="text-emerald-400" />
+                    <span className="text-emerald-400 font-bold">Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy size={13} />
+                    <span>Copy Code</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Dark Syntax Highlighted Editor */}
+            <div className="relative rounded-2xl border border-slate-800 bg-[#080d19] p-4 text-xs font-mono text-emerald-300 shadow-xl overflow-hidden flex-1">
+              <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-800 text-[10px] text-slate-400">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Ready to execute in terminal or backend service
+                </span>
+                <span className="font-mono text-slate-500">UTF-8 • REST</span>
+              </div>
+
+              <pre className="max-h-[380px] overflow-auto leading-relaxed whitespace-pre font-mono text-[12px] text-emerald-300 pr-2">
+                {apiModalTab === "curl" && activeCurlCode}
+                {apiModalTab === "python" && activePythonCode}
+                {apiModalTab === "typescript" && activeTypescriptCode}
+                {apiModalTab === "full_workflow" && workflowCode}
+              </pre>
+            </div>
+          </div>
+        </div>
+
+        {/* FOOTER CALLOUT CARDS: AUTH, INACTIVITY TTL, AND LUNA ENGINE */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 text-xs pt-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800">
+              <ShieldCheck size={15} className="text-emerald-600" />
+              <span>Authentication Header</span>
+            </div>
+            <p className="text-[11px] text-slate-500 font-mono">
+              X-API-Key: {account?.apiKeyPrefix || "docu_live_"}••••••••••
+            </p>
+            <p className="text-[10px] text-slate-400">
+              Pass via <code className="font-mono">X-API-Key</code> or <code className="font-mono">Authorization: Bearer</code> header.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800">
+              <Timer size={15} className="text-amber-600" />
+              <span>Configurable Sliding TTL</span>
+            </div>
+            <p className="text-[11px] text-slate-700 font-semibold">
+              Default: 10 min without usage
+            </p>
+            <p className="text-[10px] text-slate-400">
+              Configured via <code className="font-mono font-bold text-slate-600">DOC_TTL_MINUTES=10</code> in environment.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-1.5">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800">
+              <Terminal size={15} className="text-teal-700" />
+              <span>Active Model Engine</span>
+            </div>
+            <p className="text-[11px] text-slate-800 font-bold font-mono">
+              Luna (gpt-6-luna)
+            </p>
+            <p className="text-[10px] text-slate-400">
+              128k context, visual layout parsing &amp; deterministic structured JSON.
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

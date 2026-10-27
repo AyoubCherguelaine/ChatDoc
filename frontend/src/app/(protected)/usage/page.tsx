@@ -425,6 +425,16 @@ extractDocumentData().catch(console.error);`}
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
             <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
               <span className="rounded bg-teal-100 px-1.5 py-0.5 text-teal-800 text-[10px] font-bold">POST</span>
+              <span>/api/v1/ocr/advanced</span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Direct stateless PDF upload. Extracts layout-aware semantic blocks (text, tables, formulas, visuals) with page continuity without saving files.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
+            <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
+              <span className="rounded bg-teal-100 px-1.5 py-0.5 text-teal-800 text-[10px] font-bold">POST</span>
               <span>/api/v1/pipeline/run</span>
             </div>
             <p className="text-xs text-slate-600">
@@ -434,31 +444,21 @@ extractDocumentData().catch(console.error);`}
 
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
             <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
-              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 text-[10px] font-bold">POST</span>
-              <span>/api/v1/documents/upload</span>
+              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-800 text-[10px] font-bold">GET</span>
+              <span>/api/v1/models</span>
             </div>
             <p className="text-xs text-slate-600">
-              Ingest multi-page PDF, DOCX, XLSX, or scan images. Triggers OCR layout extraction, spatial chunking, and vector indexing.
+              List available AI models for document intelligence. Returns active model: <code className="text-teal-700 font-semibold">gpt-6-luna</code> (Luna).
             </p>
           </div>
 
           <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
             <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
               <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-800 text-[10px] font-bold">GET</span>
-              <span>/api/v1/pipeline/jobs/{'{job_id}'}</span>
+              <span>/api/v1/company/pricing</span>
             </div>
             <p className="text-xs text-slate-600">
-              Poll async batch pipeline jobs submitted via <code className="text-slate-800">async: true</code>. Returns progress, status, and payload.
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
-            <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
-              <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-800 text-[10px] font-bold">GET</span>
-              <span>/api/v1/ocr/document/{'{id}'}</span>
-            </div>
-            <p className="text-xs text-slate-600">
-              Retrieve full OCR word blocks, bounding box coordinates, line geometry, and recognized text for all pages.
+              Retrieve full pricing catalog across all 19 Document AI services, LLM compute tiers, and free trial allocations (1,200 credits).
             </p>
           </div>
         </div>

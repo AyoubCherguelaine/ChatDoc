@@ -46,6 +46,7 @@ from backend.db import query
 from backend.documents.loader import SUPPORTED_EXTENSIONS
 from backend.jobs import job_queue
 from backend.storage import storage_service
+from backend.storage.ephemeral import ephemeral_store
 
 logger = logging.getLogger(__name__)
 
@@ -295,6 +296,7 @@ async def pipeline_upload_document(
     filename = "document.txt"
     mime_type = "text/plain"
     raw_bytes = b""
+    ttl_minutes: Optional[int] = None
 
     if "application/json" in content_type:
         try:
@@ -307,6 +309,11 @@ async def pipeline_upload_document(
         filename = body.get("filename", "document.txt")
         raw_bytes = text_content.encode("utf-8")
         mime_type = "text/plain"
+        if body.get("ttl_minutes"):
+            try:
+                ttl_minutes = int(body["ttl_minutes"])
+            except (ValueError, TypeError):
+                pass
     elif "multipart/form-data" in content_type:
         form = await request.form()
         uploaded_file = form.get("file")
@@ -323,6 +330,12 @@ async def pipeline_upload_document(
         if not raw_bytes or len(raw_bytes) > 50 * 1024 * 1024:
             raise HTTPException(413, "Document size must be between 1 byte and 50 MB.")
         mime_type = uploaded_file.content_type or "application/octet-stream"
+        raw_ttl = form.get("ttl_minutes")
+        if raw_ttl:
+            try:
+                ttl_minutes = int(raw_ttl)
+            except (ValueError, TypeError):
+                pass
     else:
         # Raw bytes stream
         raw_bytes = await request.body()
@@ -364,6 +377,30 @@ async def pipeline_upload_document(
         except OSError:
             pass
 
+    # Register in Ephemeral Store with configurable inactivity TTL
+    dest_path = Path(settings.UPLOAD_DIR) / doc_id / filename
+    if not dest_path.exists():
+        e_doc = ephemeral_store.store_bytes(
+            raw_bytes=raw_bytes,
+            filename=filename,
+            user_id=str(account.user_id),
+            mime_type=mime_type,
+            ttl_minutes=ttl_minutes,
+            doc_id=doc_id,
+        )
+    else:
+        e_doc = ephemeral_store.register_file(
+            doc_id=doc_id,
+            user_id=str(account.user_id),
+            file_path=dest_path,
+            filename=filename,
+            file_size=file_size,
+            mime_type=mime_type,
+            page_count=page_count,
+            chunk_count=chunk_count,
+            ttl_minutes=ttl_minutes,
+        )
+
     return {
         "status": "success",
         "documentId": doc_id,
@@ -371,7 +408,11 @@ async def pipeline_upload_document(
         "fileSize": file_size,
         "pageCount": page_count,
         "chunkCount": chunk_count,
+        "ttlMinutes": e_doc.ttl_minutes,
+        "remainingSeconds": e_doc.remaining_seconds,
+        "expiresAt": e_doc.expires_at.isoformat(),
         "creditsRemaining": account.remaining_credits,
+        "message": f"Document session active. Retained for {e_doc.ttl_minutes} minutes without usage. Inactivity resets on each service call.",
     }
 
 
@@ -456,6 +497,38 @@ def pipeline_get_document(
     }
 
 
+@router.get("/documents/{doc_id}/status", summary="Check Ephemeral Document Inactivity TTL Status")
+def pipeline_get_document_status(
+    doc_id: str,
+    account: CompanyAccount = CompanyAuth,
+):
+    """Check remaining seconds and expiration for an active document session."""
+    e_doc = ephemeral_store.get_and_touch(doc_id, extend_ttl=False)
+    if not e_doc:
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail=f"Document session '{doc_id}' has expired after {settings.DOC_TTL_MINUTES} minutes of inactivity or does not exist.",
+        )
+    return {
+        "status": "active",
+        **e_doc.to_dict(),
+    }
+
+
+@router.delete("/documents/{doc_id}", summary="Delete Ephemeral Document Session")
+def pipeline_delete_document(
+    doc_id: str,
+    account: CompanyAccount = CompanyAuth,
+):
+    """Purge document session and delete all associated files immediately."""
+    deleted = ephemeral_store.delete(doc_id)
+    return {
+        "status": "success" if deleted else "not_found",
+        "documentId": doc_id,
+        "message": "Document session and storage purged." if deleted else "Document session not found or already purged.",
+    }
+
+
 @router.get("/documents/{doc_id}/search", summary="Pipeline Hybrid Chunk Retrieval")
 def pipeline_search_document(
     doc_id: str,
@@ -502,7 +575,11 @@ def pipeline_search_document(
 
 
 def _resolve_document_file_path(doc_id: str) -> tuple[Path, str]:
-    """Helper to locate document on disk or storage."""
+    """Helper to locate document on disk or storage and touch sliding inactivity TTL."""
+    e_doc = ephemeral_store.get_and_touch(doc_id, extend_ttl=True)
+    if e_doc and e_doc.file_path and e_doc.file_path.exists():
+        return e_doc.file_path, e_doc.filename
+
     filename = f"doc_{doc_id}.pdf"
     file_path = None
     try:
@@ -550,126 +627,172 @@ async def pipeline_advanced_ocr(
     request: Request,
     account: CompanyAccount = CompanyAuth,
 ):
-    """Extract semantic blocks in page order with free-form content and continuation links.
+    """Extract semantic blocks from an uploaded PDF or active ephemeral document session.
 
-    Supports direct ephemeral PDF upload (multipart/form-data) without saving to user drive storage,
-    as well as JSON payloads referencing existing document IDs.
+    Stateless ephemeral Document AI: documents are retained for 10 minutes without usage.
+    Each usage resets the 10-minute inactivity timer. After 10 minutes of inactivity,
+    files and resources are automatically purged.
     At most 50 pages per request. The first selected page has no predecessor context.
     """
     from backend.agent.tools.advanced_ocr import AdvancedOcrService
     from backend.agent.tools.ocr import OcrError
 
     content_type = request.headers.get("content-type", "")
+    target_path: Optional[Path] = None
+    target_filename: str = "document.pdf"
+    target_doc_id: Optional[str] = None
+    e_doc: Optional[EphemeralDocument] = None
+    tmp_path_to_clean: Optional[Path] = None
 
-    if "multipart/form-data" in content_type:
+    start_page: int = 1
+    end_page: Optional[int] = None
+    language: str = "auto"
+
+    if "application/json" in content_type:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=422, detail="Invalid JSON payload.")
+        doc_id = body.get("document_id")
+        if not doc_id:
+            raise HTTPException(status_code=422, detail="Field 'document_id' or 'file' is required.")
+        e_doc = ephemeral_store.get_and_touch(str(doc_id), extend_ttl=True)
+        if not e_doc:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Document session '{doc_id}' not found or expired after inactivity.",
+            )
+        target_path = e_doc.file_path
+        target_filename = e_doc.filename
+        target_doc_id = e_doc.doc_id
+
+        raw_start = body.get("start_page", 1)
+        try:
+            start_page = int(raw_start)
+            if start_page < 1:
+                raise ValueError("start_page must be >= 1")
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=422, detail="start_page must be an integer >= 1")
+
+        raw_end = body.get("end_page")
+        if raw_end is not None and str(raw_end).strip() != "":
+            try:
+                end_page = int(raw_end)
+                if end_page < start_page:
+                    raise ValueError("end_page must be >= start_page")
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=422, detail="end_page must be an integer >= start_page")
+
+        language = str(body.get("language", "auto")).lower()
+
+    elif "multipart/form-data" in content_type:
         form = await request.form()
         uploaded_file = form.get("file")
-        if uploaded_file and hasattr(uploaded_file, "filename"):
-            filename = Path((uploaded_file.filename or "document.pdf").replace("\\", "/")).name
-            if Path(filename).suffix.lower() != ".pdf":
+        form_doc_id = form.get("document_id")
+
+        if not uploaded_file and not form_doc_id:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="A PDF document 'file' or active 'document_id' is required.",
+            )
+
+        if form_doc_id and not uploaded_file:
+            e_doc = ephemeral_store.get_and_touch(str(form_doc_id), extend_ttl=True)
+            if not e_doc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Document session '{form_doc_id}' not found or expired after inactivity.",
+                )
+            target_path = e_doc.file_path
+            target_filename = e_doc.filename
+            target_doc_id = e_doc.doc_id
+        elif uploaded_file:
+            if not hasattr(uploaded_file, "filename"):
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail="A valid PDF document 'file' is required.",
+                )
+            raw_filename = Path((uploaded_file.filename or "document.pdf").replace("\\", "/")).name
+            if Path(raw_filename).suffix.lower() != ".pdf":
                 raise HTTPException(status_code=422, detail="Advanced OCR requires a PDF document")
 
             raw_bytes = await uploaded_file.read(50 * 1024 * 1024 + 1)
             if not raw_bytes or len(raw_bytes) > 50 * 1024 * 1024:
                 raise HTTPException(status_code=413, detail="PDF size must be between 1 byte and 50 MB.")
 
+            # Store in ephemeral store with sliding inactivity TTL (default 10 min)
             try:
-                start_page = int(form.get("start_page", 1))
-                if start_page < 1:
-                    raise ValueError("start_page must be >= 1")
-            except (ValueError, TypeError):
-                raise HTTPException(status_code=422, detail="start_page must be an integer >= 1")
-
-            end_page = None
-            raw_end = form.get("end_page")
-            if raw_end is not None and str(raw_end).strip() != "":
-                try:
-                    end_page = int(raw_end)
-                    if end_page < start_page:
-                        raise ValueError("end_page must be >= start_page")
-                except (ValueError, TypeError):
-                    raise HTTPException(status_code=422, detail="end_page must be an integer >= start_page")
-
-            language = str(form.get("language", "auto")).lower()
-            if language not in ("auto", "ar", "en", "mixed"):
-                language = "auto"
-
-            # Ephemeral Document AI processing: not saved to user documents or permanent storage
-            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                tmp.write(raw_bytes)
-                tmp_path = Path(tmp.name)
-
-            try:
-                data = await run_in_threadpool(
-                    AdvancedOcrService().extract,
-                    tmp_path,
-                    start_page=start_page,
-                    end_page=end_page,
-                    language=language,
+                e_doc = ephemeral_store.store_bytes(
+                    raw_bytes=raw_bytes,
+                    filename=raw_filename,
+                    user_id=str(account.user_id),
+                    mime_type="application/pdf",
                 )
-                return {
-                    **data,
-                    "status": "success",
-                    "document_id": None,
-                    "filename": filename,
-                }
-            except ValueError as exc:
-                raise HTTPException(status_code=422, detail=str(exc)) from exc
-            except OcrError as exc:
-                logger.warning("Advanced OCR failed for uploaded file %s: %s", filename, exc)
-                raise HTTPException(status_code=502, detail=str(exc)) from exc
-            finally:
-                if tmp_path.exists():
-                    tmp_path.unlink(missing_ok=True)
+                target_path = e_doc.file_path
+                target_filename = e_doc.filename
+                target_doc_id = e_doc.doc_id
+            except Exception:
+                # Fallback to temp file if ephemeral directory writing fails
+                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                    tmp.write(raw_bytes)
+                    tmp_path_to_clean = Path(tmp.name)
+                target_path = tmp_path_to_clean
+                target_filename = raw_filename
 
-        doc_id = form.get("document_id")
-        if not doc_id:
-            raise HTTPException(status_code=422, detail="Either a PDF 'file' or 'document_id' must be provided.")
         try:
             start_page = int(form.get("start_page", 1))
+            if start_page < 1:
+                raise ValueError("start_page must be >= 1")
         except (ValueError, TypeError):
-            start_page = 1
-        end_page = int(form.get("end_page")) if form.get("end_page") else None
-        language = str(form.get("language", "auto"))
-        payload = AdvancedOcrPayload(
-            document_id=str(doc_id),
-            start_page=start_page,
-            end_page=end_page,
-            language=language if language in ("auto", "ar", "en", "mixed") else "auto",
-        )
-    else:
-        try:
-            body = await request.json()
-        except Exception:
-            raise HTTPException(status_code=400, detail="Invalid JSON payload")
-        try:
-            payload = AdvancedOcrPayload(**body)
-        except Exception as exc:
-            raise HTTPException(status_code=422, detail=str(exc))
+            raise HTTPException(status_code=422, detail="start_page must be an integer >= 1")
 
-    document = query(
-        "SELECT id, original_filename FROM docuchat.documents WHERE id = %s AND user_id = %s",
-        (payload.document_id, account.user_id), one=True,
-    )
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-    if Path(document["original_filename"]).suffix.lower() != ".pdf":
-        raise HTTPException(status_code=422, detail="Advanced OCR requires a PDF document")
-    file_path, filename = _resolve_document_file_path(payload.document_id)
+        raw_end = form.get("end_page")
+        if raw_end is not None and str(raw_end).strip() != "":
+            try:
+                end_page = int(raw_end)
+                if end_page < start_page:
+                    raise ValueError("end_page must be >= start_page")
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=422, detail="end_page must be an integer >= start_page")
+
+        language = str(form.get("language", "auto")).lower()
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="PDF file upload or document_id is required. Drive storage lookup is disabled.",
+        )
+
+    if language not in ("auto", "ar", "en", "mixed"):
+        language = "auto"
+
+    if not target_path or not target_path.exists():
+        raise HTTPException(status_code=422, detail="Unable to resolve document file path.")
+
     try:
         data = await run_in_threadpool(
             AdvancedOcrService().extract,
-            file_path,
-            start_page=payload.start_page,
-            end_page=payload.end_page,
-            language=payload.language,
+            target_path,
+            start_page=start_page,
+            end_page=end_page,
+            language=language,
         )
-        return {**data, "status": "success", "document_id": payload.document_id, "filename": filename}
+        return {
+            **data,
+            "status": "success",
+            "document_id": target_doc_id,
+            "filename": target_filename,
+            "ttl_minutes": e_doc.ttl_minutes if e_doc else settings.DOC_TTL_MINUTES,
+            "remaining_seconds": e_doc.remaining_seconds if e_doc else None,
+            "expires_at": e_doc.expires_at.isoformat() if e_doc else None,
+        }
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except OcrError as exc:
-        logger.warning("Advanced OCR failed for %s: %s", payload.document_id, exc)
+        logger.warning("Advanced OCR failed for file %s: %s", target_filename, exc)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    finally:
+        if tmp_path_to_clean and tmp_path_to_clean.exists():
+            tmp_path_to_clean.unlink(missing_ok=True)
 
 
 @router.get("/ocr/document/{doc_id}", summary="Extract Layout-Aware Document Blocks")
@@ -833,7 +956,9 @@ async def pipeline_run_service(
 
     # Load bundle from document_id or text_content
     target_doc_id = payload.document_id
+    e_doc = None
     if target_doc_id:
+        e_doc = ephemeral_store.get_and_touch(target_doc_id, extend_ttl=True)
         try:
             bundle = rag.get_bundle(target_doc_id)
         except Exception as exc:
@@ -959,6 +1084,11 @@ async def pipeline_run_service(
         "success": True,
         "raw": raw_text,
     }
+
+    if e_doc:
+        response_data["ttlMinutes"] = e_doc.ttl_minutes
+        response_data["remainingSeconds"] = e_doc.remaining_seconds
+        response_data["expiresAt"] = e_doc.expires_at.isoformat()
 
     if payload.output_format == "json" or parsed_json is not None:
         response_data["data"] = parsed_json
@@ -1477,4 +1607,30 @@ def get_service_pricing_catalog():
             }
             for k, v in SERVICE_PRICING.items()
         ],
+    }
+
+
+@router.get("/models", summary="List Available AI Models", tags=["Models"])
+def list_available_models():
+    """Retrieve available AI models for document intelligence.
+
+    Currently configured: 'gpt-6-luna' (Luna) for high-performance vision OCR,
+    structured schema generation, and bilingual Arabic/English document reasoning.
+    """
+    model_name = settings.DEFAULT_MODEL or "gpt-6-luna"
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": model_name,
+                "name": "Luna (GPT-6 Luna)",
+                "description": "High-accuracy vision, layout-aware semantic OCR, and bilingual reasoning engine.",
+                "capabilities": ["vision", "semantic_ocr", "arabic_english", "structured_json", "rag"],
+                "context_window": 128000,
+                "status": "available",
+                "is_default": True,
+            }
+        ],
+        "default_model": model_name,
+        "total_available": 1,
     }

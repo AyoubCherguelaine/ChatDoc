@@ -167,9 +167,12 @@ export function extractAdvancedOcr(payload: AdvancedOcrParams | FormData) {
   });
 }
 
-export function uploadDocument(file: File) {
+export function uploadDocument(file: File, options?: { maxPages?: number }) {
   const form = new FormData();
   form.append("file", file);
+  if (options?.maxPages) {
+    form.append("max_pages", options.maxPages.toString());
+  }
   return api<{
     id: string;
     filename: string;
@@ -489,6 +492,28 @@ export function fetchCompanyUsage() {
   return api<CompanyUsageResponse>("/company/usage");
 }
 
+export interface AvailableModelItem {
+  id: string;
+  name: string;
+  description: string;
+  capabilities: string[];
+  context_window?: number;
+  status: string;
+  is_default: boolean;
+  pricing_tier?: string;
+}
+
+export interface AvailableModelsResponse {
+  object: string;
+  data: AvailableModelItem[];
+  default_model: string;
+  total_available: number;
+}
+
+export function fetchAvailableModels() {
+  return api<AvailableModelsResponse>("/v1/models");
+}
+
 export interface PlaygroundPreset {
   id: string;
   name: string;
@@ -548,6 +573,34 @@ export function runPlayground(payload: PlaygroundRunPayload) {
   return api<PlaygroundRunResult>("/playground/run", {
     method: "POST",
     body: JSON.stringify(payload),
+  });
+}
+
+export interface EphemeralDocumentStatusResponse {
+  status: "active" | "expired";
+  documentId: string;
+  filename: string;
+  fileSize: number;
+  mimeType: string;
+  pageCount: number;
+  chunkCount: number;
+  ttlMinutes: number;
+  remainingSeconds: number;
+  isExpired: boolean;
+  createdAt: string;
+  lastAccessedAt: string;
+  expiresAt: string;
+}
+
+export function fetchDocumentStatus(docId: string) {
+  return api<EphemeralDocumentStatusResponse>(`/v1/documents/${docId}/status`, {
+    method: "GET",
+  });
+}
+
+export function deleteDocumentSession(docId: string) {
+  return api<{ status: string; documentId: string; message: string }>(`/v1/documents/${docId}`, {
+    method: "DELETE",
   });
 }
 
