@@ -76,11 +76,11 @@ export function DocumentCard({ doc, onSaved }: DocumentCardProps) {
 
   return (
     <>
-      <Card className="group !rounded-2xl !border-[#e3e9ec] !shadow-none transition hover:!border-[#b8cfc4]">
+      <Card className="group !rounded-2xl !border-slate-200 !bg-white !shadow-none transition hover:!border-emerald-500/50 dark:!border-slate-800 dark:!bg-[#121820]">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-base">
+          <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-white">
             <span
-              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${/\.(xls|xlsx|csv)$/i.test(doc.originalFilename) ? "bg-[#eaf4ea] text-[#6b9566]" : "bg-[#f9eee8] text-[#c59175]"}`}
+              className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${/\.(xls|xlsx|csv)$/i.test(doc.originalFilename) ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400" : "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400"}`}
             >
               {/\.(xls|xlsx|csv)$/i.test(doc.originalFilename) ? (
                 <FileSpreadsheet size={20} />

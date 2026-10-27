@@ -50,13 +50,13 @@ export function Dialog({
         }
       }}
       className={cn(
-        "fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 text-[#192d35] shadow-2xl backdrop:bg-[#112d32]/40 backdrop:backdrop-blur-sm",
+        "fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-2xl border border-slate-200 bg-white p-6 text-slate-900 shadow-2xl backdrop:bg-slate-950/60 backdrop:backdrop-blur-xs dark:border-slate-800 dark:bg-[#121820] dark:text-slate-100",
         className,
       )}
     >
       <button
         onClick={() => onOpenChange(false)}
-        className="absolute right-3 top-3 rounded p-1 text-slate-400 hover:bg-slate-100"
+        className="absolute right-3 top-3 rounded p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
         aria-label="Close"
       >
         <X size={18} />

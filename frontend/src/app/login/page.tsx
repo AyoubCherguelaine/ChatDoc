@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 function LoginForm() {
   const search = useSearchParams();
@@ -53,57 +54,62 @@ function LoginForm() {
   };
 
   return (
-    <div className="grid min-h-screen bg-[#fcfdfb] lg:grid-cols-2">
-      <aside className="relative hidden flex-col overflow-hidden bg-[#173e38] p-12 text-white lg:flex">
+    <div className="grid min-h-screen bg-white text-slate-900 dark:bg-[#090d12] dark:text-slate-100 lg:grid-cols-2 transition-colors">
+      <aside className="relative hidden flex-col overflow-hidden bg-gradient-to-b from-[#061816] via-[#09221f] to-[#040e0d] p-12 text-white lg:flex border-r border-slate-800">
         <Brand light />
         <div className="my-auto py-20">
-          <span className="inline-block rounded-2xl border border-[#416159] bg-[#244a42] p-5 text-[#cce3b8]">
+          <span className="inline-block rounded-2xl border border-emerald-700/50 bg-emerald-950/60 p-5 text-emerald-400 shadow-lg shadow-emerald-950/40">
             <Layers size={38} />
           </span>
-          <h2 className="mt-9 max-w-lg text-5xl font-medium leading-tight tracking-tight">
+          <h2 className="mt-9 max-w-lg text-5xl font-extrabold leading-tight tracking-tight">
             A little less searching.
             <br />
-            <span className="text-[#c4dcae]">A lot more clarity.</span>
+            <span className="text-emerald-400">A lot more clarity.</span>
           </h2>
-          <p className="mt-6 max-w-md text-sm leading-7 text-[#a6c2b5]">
+          <p className="mt-6 max-w-md text-sm leading-7 text-slate-300">
             Bring your documents, spreadsheets, and ideas together. Your next
             insight is one good question away.
           </p>
-          <div className="mt-10 flex gap-3 text-[11px] text-[#b2cdbf]">
-            <span className="rounded-full border border-[#45695b] px-3 py-1">
-              PDF
+          <div className="mt-10 flex gap-3 text-[11px] text-emerald-200">
+            <span className="rounded-full border border-emerald-800/80 bg-emerald-950/40 px-3.5 py-1">
+              PDF Documents
             </span>
-            <span className="rounded-full border border-[#45695b] px-3 py-1">
-              Word
+            <span className="rounded-full border border-emerald-800/80 bg-emerald-950/40 px-3.5 py-1">
+              Word & DOCX
             </span>
-            <span className="rounded-full border border-[#45695b] px-3 py-1">
-              Excel
+            <span className="rounded-full border border-emerald-800/80 bg-emerald-950/40 px-3.5 py-1">
+              Excel & Sheets
             </span>
           </div>
         </div>
-        <p className="text-xs text-[#8fac9d]">
+        <p className="text-xs text-slate-400">
           Your knowledge. A little more connected.
         </p>
       </aside>
+
       <div className="flex min-h-screen flex-col p-6 sm:p-12">
-        <Link
-          href="/"
-          className="flex items-center gap-2 text-xs text-slate-500"
-        >
-          <ArrowLeft size={14} /> Back to home
-        </Link>
+        <div className="flex items-center justify-between">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition"
+          >
+            <ArrowLeft size={14} /> Back to home
+          </Link>
+          <ThemeToggle />
+        </div>
+
         <div className="mx-auto my-auto w-full max-w-sm py-12">
           <div className="mb-8 lg:hidden">
             <Brand />
           </div>
           <Card className="w-full !border-0 !bg-transparent !shadow-none">
             <CardHeader className="!px-0 !pt-0">
-              <CardTitle className="text-3xl tracking-tight">
+              <CardTitle className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                 {mode === "login"
                   ? "Welcome back."
                   : "Make room for your next idea."}
               </CardTitle>
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
                 {mode === "login"
                   ? "Your documents and conversations are right where you left them."
                   : "Create your personal knowledge workspace."}
@@ -155,11 +161,11 @@ function LoginForm() {
                   />
                 </div>
                 {error && (
-                  <p className="rounded-md bg-rose-50 p-2 text-sm text-rose-700">
+                  <p className="rounded-md bg-rose-50 border border-rose-200 p-2.5 text-sm text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300">
                     {error}
                   </p>
                 )}
-                <Button type="submit" className="w-full" disabled={submitting}>
+                <Button type="submit" className="w-full bg-gradient-to-r from-teal-700 to-emerald-600 hover:from-teal-800 hover:to-emerald-700 text-white font-semibold" disabled={submitting}>
                   {submitting ? (
                     <Spinner size={18} />
                   ) : mode === "login" ? (
@@ -170,10 +176,10 @@ function LoginForm() {
                 </Button>
               </form>
 
-              <div className="mt-4 text-center text-sm">
+              <div className="mt-5 text-center text-sm">
                 <button
                   type="button"
-                  className="text-indigo-600 hover:underline"
+                  className="font-semibold text-emerald-700 hover:text-emerald-800 hover:underline dark:text-emerald-400 dark:hover:text-emerald-300"
                   onClick={() => setMode(mode === "login" ? "signup" : "login")}
                 >
                   {mode === "login"
@@ -183,7 +189,7 @@ function LoginForm() {
               </div>
             </CardContent>
           </Card>
-          <p className="mt-8 text-center text-[10px] text-slate-400">
+          <p className="mt-8 text-center text-[10px] text-slate-400 dark:text-slate-500">
             A thoughtful workspace for your documents and ideas.
           </p>
         </div>
@@ -196,7 +202,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center">
+        <div className="flex min-h-screen items-center justify-center bg-white dark:bg-[#090d12]">
           <Spinner size={24} />
         </div>
       }

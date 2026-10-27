@@ -17,11 +17,11 @@ export default function ProtectedWorkspaceError({
   }, [error]);
 
   return (
-    <div className="mx-auto my-12 max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xs">
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+    <div className="mx-auto my-12 max-w-lg rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-xs dark:border-slate-800 dark:bg-[#121820]">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
         <AlertCircle size={26} />
       </div>
-      <h2 className="text-lg font-semibold text-slate-900">
+      <h2 className="text-lg font-bold text-slate-900 dark:text-white">
         Something went wrong in your workspace
       </h2>
       <p className="mt-2 text-xs leading-5 text-slate-500">

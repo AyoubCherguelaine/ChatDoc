@@ -289,7 +289,7 @@ JWT_SECRET=docuchat-dev-secret-change-me
 ```bash
 cd frontend
 npm install
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api" > .env.local
+echo "NEXT_PUBLIC_API_URL=/api" > .env.local
 ```
 
 ---
@@ -305,7 +305,8 @@ echo "NEXT_PUBLIC_API_URL=http://localhost:8000/api" > .env.local
 | `EMBEDDING_MODEL` | root `.env` | No | `text-embedding-3-small` | Embedding model (1 536-dim) |
 | `DATABASE_URL` | `backend/.env` | Yes | `postgresql://postgres:docuchat123@localhost:5436/docuchat` | PostgreSQL (with the `pgvector` extension) |
 | `JWT_SECRET` | `backend/.env` | No | `docuchat-dev-secret-change-me` | HS256 secret for auth tokens |
-| `NEXT_PUBLIC_API_URL` | `frontend/.env.local` | Yes | `http://localhost:8000/api` | Backend API base URL seen by the browser |
+| `NEXT_PUBLIC_API_URL` | `frontend/.env.local` | No | `/api` | API base URL seen by the browser; same origin by default |
+| `BACKEND_URL` | `frontend/.env.local` or Docker build argument | No | `http://127.0.0.1:8000` (Docker: `http://backend:8000`) | Server-side API proxy target; rebuild frontend after changing |
 | `OLLAMA_HOST` | root `.env` | No | — | Ollama server URL (optional LLM fallback) |
 
 > **Backend `.env` setup:** copy `backend/.env` (already populated with dev defaults), then set `DATABASE_URL` / `JWT_SECRET` as needed.

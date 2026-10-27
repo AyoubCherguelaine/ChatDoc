@@ -53,9 +53,9 @@ export function UploadForm({ onDone }: { onDone: () => void }) {
           setDragging(false);
           select(e.dataTransfer.files[0] ?? null);
         }}
-        className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${dragging ? "border-teal-600 bg-teal-50" : "border-[#d8e4df] bg-[#f8fbf9]"}`}
+        className={`rounded-xl border-2 border-dashed p-8 text-center transition-colors ${dragging ? "border-emerald-500 bg-emerald-50 dark:border-emerald-500 dark:bg-emerald-950/40" : "border-slate-200 bg-white hover:border-emerald-400 dark:border-slate-800 dark:bg-[#121820]"}`}
       >
-        <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-white text-teal-700 shadow-sm">
+        <span className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-50 text-emerald-700 shadow-sm dark:bg-slate-900 dark:text-emerald-400">
           <UploadCloud size={23} />
         </span>
         <p className="text-sm font-medium">A new file. A new perspective.</p>

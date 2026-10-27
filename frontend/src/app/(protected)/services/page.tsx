@@ -49,7 +49,7 @@ const services: ServiceCardInfo[] = [
     llmTier: "Light / Retrieval",
     icon: <FileText size={28} />,
     workflowId: "actions",
-    color: "bg-[#eef4e8] text-[#7a925b]",
+    color: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
     detail: "Conversational Q&A over any uploaded document with inline source citations.",
   },
   {
@@ -317,47 +317,47 @@ export default function ServicesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl animate-enter">
+    <div className="mx-auto max-w-6xl animate-enter text-slate-900 dark:text-slate-100">
       {/* Header */}
       <div className="mb-8">
         <p className="eyebrow mb-2">Workspace / Services</p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">
+            <h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-white">
               Enterprise Document AI Solutions
             </h1>
-            <p className="mt-1 text-sm text-[#87959c]">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               B2B Document AI capabilities ready for production via our unified REST API. Test interactively in the sandbox demo or integrate directly using your company API key.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
               href="/docs"
-              className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300"
             >
-              <BookOpen size={13} className="text-teal-600" />
+              <BookOpen size={13} className="text-emerald-600 dark:text-emerald-400" />
               <span>Platform Docs</span>
             </Link>
             <Link
               href="/usage"
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition"
+              className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100 transition dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300"
             >
-              <Key size={13} className="text-teal-600" />
+              <Key size={13} className="text-emerald-600 dark:text-emerald-400" />
               <span>
                 {account
                   ? `${account.remainingCredits.toLocaleString()} / 1,200 Credits`
                   : "1,200 Free Trial Credits"}
               </span>
             </Link>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-              <Sparkles size={13} className="text-teal-600" /> {services.length} AI Services Active
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+              <Sparkles size={13} className="text-emerald-600 dark:text-emerald-400" /> {services.length} AI Services Active
             </span>
           </div>
         </div>
       </div>
 
       {/* Filter and Mode Bar */}
-      <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-6 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs sm:flex-row sm:items-center sm:justify-between dark:border-slate-800 dark:bg-[#121820]">
         <div className="relative flex-1">
           <Search size={15} className="absolute left-3.5 top-3 text-slate-400" />
           <input
@@ -366,7 +366,7 @@ export default function ServicesPage() {
             placeholder="Search AI services by keyword, extraction field, or capability…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:bg-white"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-xs text-slate-800 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:bg-white dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
         </div>
         <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
@@ -423,7 +423,7 @@ export default function ServicesPage() {
           {filteredServices.map((svc) => (
             <div
               key={svc.id}
-              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-xs transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+              className="group flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-6 shadow-xs transition hover:-translate-y-0.5 hover:border-emerald-500/50 hover:shadow-md dark:border-slate-800 dark:bg-[#121820]"
             >
               <div>
                 <div className="mb-4 flex items-center justify-between">
@@ -433,27 +433,27 @@ export default function ServicesPage() {
                     {svc.icon}
                   </span>
                   <div className="flex flex-col items-end gap-1">
-                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600 uppercase">
+                    <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-semibold tracking-wide text-slate-600 uppercase dark:bg-slate-800 dark:text-slate-300">
                       {svc.badge}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 border border-teal-100">
+                    <span className="inline-flex items-center gap-1 rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800 border border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-800/60 dark:text-emerald-300">
                       <Coins size={10} /> {svc.credits} credits
                     </span>
                   </div>
                 </div>
 
-                <h2 className="text-base font-semibold text-slate-900 group-hover:text-teal-900 transition">
+                <h2 className="text-base font-bold text-slate-900 group-hover:text-emerald-700 dark:text-white dark:group-hover:text-emerald-400 transition">
                   {svc.title}
                 </h2>
                 <div className="mt-1 flex items-center gap-2">
-                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] text-slate-500">
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                     {svc.llmTier}
                   </span>
                 </div>
-                <p className="mt-1.5 text-xs leading-5 text-slate-600">
+                <p className="mt-1.5 text-xs leading-5 text-slate-600 dark:text-slate-400">
                   {svc.description}
                 </p>
-                <p className="mt-3 rounded-lg bg-slate-50 p-2.5 text-[11px] leading-relaxed text-slate-500 border border-slate-100">
+                <p className="mt-3 rounded-lg bg-slate-50 p-2.5 text-[11px] leading-relaxed text-slate-500 border border-slate-100 dark:bg-slate-900/60 dark:border-slate-800 dark:text-slate-400">
                   {svc.detail}
                 </p>
               </div>
@@ -461,7 +461,7 @@ export default function ServicesPage() {
               <div className="mt-5 flex items-center gap-2">
                 <Link
                   href={`/playground?service=${svc.id}`}
-                  className="flex-1 flex items-center justify-between rounded-lg bg-teal-50 px-3.5 py-2.5 text-xs font-semibold text-teal-800 border border-teal-200/80 hover:bg-teal-700 hover:text-white transition group-hover:border-teal-700"
+                  className="flex-1 flex items-center justify-between rounded-lg bg-emerald-50 px-3.5 py-2.5 text-xs font-semibold text-emerald-800 border border-emerald-200/80 hover:bg-emerald-600 hover:text-white transition group-hover:border-emerald-600 dark:bg-emerald-950/40 dark:border-emerald-800/60 dark:text-emerald-300 dark:hover:bg-emerald-600 dark:hover:text-white"
                 >
                   <span className="flex items-center gap-1.5">
                     <Sparkles size={14} /> Sandbox Demo
@@ -471,9 +471,9 @@ export default function ServicesPage() {
                 <Link
                   href={`/docs?service=${svc.id}`}
                   title="View Platform REST API documentation"
-                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-teal-900 shadow-2xs transition"
+                  className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-emerald-800 shadow-2xs transition dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300 dark:hover:bg-slate-800"
                 >
-                  <Code2 size={14} className="text-[#087f74]" />
+                  <Code2 size={14} className="text-emerald-600 dark:text-emerald-400" />
                   <span>API Docs</span>
                 </Link>
               </div>

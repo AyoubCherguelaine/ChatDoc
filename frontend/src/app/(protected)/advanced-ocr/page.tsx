@@ -80,7 +80,7 @@ export default function AdvancedOcrPage() {
   const [copied, setCopied] = useState(false);
 
   const fieldClass =
-    "mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 disabled:opacity-50";
+    "mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-500";
 
   function handleFileSelection(candidate: File | null) {
     if (!candidate) return;
@@ -407,8 +407,8 @@ export default function AdvancedOcrPage() {
         </div>
 
         {/* Information note */}
-        <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3.5 text-xs text-slate-500">
-          <FileCheck2 size={16} className="mt-0.5 shrink-0 text-teal-600" />
+        <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3.5 text-xs text-slate-500 dark:bg-slate-900/60 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
+          <FileCheck2 size={16} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span>
             Processes up to 50 pages per run. Content adapts to your document layout, preserving reading
             continuity across page breaks. Stateless Document AI processing — your files are processed ephemerally and never saved.
@@ -420,7 +420,7 @@ export default function AdvancedOcrPage() {
           <Button
             type="submit"
             disabled={busy || !file}
-            className="bg-teal-700 px-6 font-medium text-white hover:bg-teal-800 disabled:opacity-50"
+            className="bg-gradient-to-r from-teal-700 to-emerald-600 px-6 font-medium text-white hover:from-teal-800 hover:to-emerald-700 disabled:opacity-50"
             leftIcon={busy ? <Spinner size={16} /> : <ScanText size={18} />}
           >
             {busy ? "Analyzing PDF with Vision AI…" : "Extract Document Blocks"}

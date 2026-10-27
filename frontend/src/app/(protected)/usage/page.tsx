@@ -122,15 +122,15 @@ export default function ApiUsagePage() {
         <p className="eyebrow mb-2">Company / API Usage & Billing</p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">
+            <h1 className="text-[28px] font-bold tracking-tight text-slate-900 dark:text-white">
               Company API Usage & Credit Quota
             </h1>
-            <p className="mt-1 text-sm text-[#87959c]">
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
               Enterprise API access with automated credit billing per LLM compute usage.
             </p>
           </div>
           <div>
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1 text-xs font-semibold text-emerald-800 shadow-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3.5 py-1 text-xs font-semibold text-emerald-800 shadow-xs dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
               <Zap size={14} className="text-emerald-600" /> Free Trial Tier Available Only
             </span>
           </div>
@@ -144,31 +144,31 @@ export default function ApiUsagePage() {
       )}
 
       {/* Credit Balance Card */}
-      <div className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+      <div className="mb-8 overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-[#121820]">
         <div className="grid gap-6 md:grid-cols-12 md:items-center">
           <div className="md:col-span-7">
-            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
-              <CreditCard size={15} className="text-teal-700" /> Free Trial Credit Quota
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              <CreditCard size={15} className="text-emerald-600 dark:text-emerald-400" /> Free Trial Credit Quota
             </div>
             <div className="mt-2 flex items-baseline gap-3">
-              <span className="text-4xl font-bold tracking-tight text-slate-900">
+              <span className="text-4xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                 {remaining.toLocaleString()}
               </span>
-              <span className="text-sm font-medium text-slate-500">
+              <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
                 / {total.toLocaleString()} credits remaining
               </span>
             </div>
-            <p className="mt-1 text-xs text-slate-500">
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Every company receives <strong>1,200 starting credits</strong> to run all enterprise Document AI services.
             </p>
 
             {/* Visual Progress Bar */}
             <div className="mt-4">
-              <div className="flex justify-between text-xs font-medium text-slate-600 mb-1.5">
+              <div className="flex justify-between text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">
                 <span>{percentRemaining}% credits available</span>
                 <span>{used.toLocaleString()} credits consumed</span>
               </div>
-              <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-teal-600 to-emerald-500 transition-all duration-500"
                   style={{ width: `${percentRemaining}%` }}
@@ -177,43 +177,43 @@ export default function ApiUsagePage() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-4 md:col-span-5">
+          <div className="flex flex-col gap-3 rounded-xl border border-slate-100 bg-slate-50/70 p-4 md:col-span-5 dark:border-slate-800 dark:bg-slate-900/60">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Account Plan</span>
-              <span className="font-semibold text-slate-800">Company Free Trial</span>
+              <span className="text-slate-500 dark:text-slate-400">Account Plan</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Company Free Trial</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Trial Credits Included</span>
-              <span className="font-semibold text-emerald-700">1,200 Credits</span>
+              <span className="text-slate-500 dark:text-slate-400">Trial Credits Included</span>
+              <span className="font-semibold text-emerald-600 dark:text-emerald-400">1,200 Credits</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Active API Keys</span>
-              <span className="font-semibold text-slate-800">1 Live Key</span>
+              <span className="text-slate-500 dark:text-slate-400">Active API Keys</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">1 Live Key</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500">Billing Model</span>
-              <span className="font-semibold text-slate-800">Pay-per-Service Usage</span>
+              <span className="text-slate-500 dark:text-slate-400">Billing Model</span>
+              <span className="font-semibold text-slate-800 dark:text-slate-200">Pay-per-Service Usage</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* API Key Management Box */}
-      <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+      <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-800 dark:bg-[#121820]">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-50 text-teal-800">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
               <Key size={18} />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-slate-900">Company API Key</h2>
-              <p className="text-xs text-slate-500">Use this secret key to authenticate corporate API requests.</p>
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Company API Key</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">Use this secret key to authenticate corporate API requests.</p>
             </div>
           </div>
           <Button
             onClick={handleRegenerate}
             disabled={regenerating}
-            className="flex items-center gap-1.5 border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs"
+            className="flex items-center gap-1.5 border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 shadow-xs dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
           >
             <RefreshCw size={13} className={regenerating ? "animate-spin" : ""} />
             {regenerating ? "Rolling key…" : "Regenerate Key"}
@@ -226,11 +226,11 @@ export default function ApiUsagePage() {
               type="text"
               readOnly
               value={showKey ? displayKey : maskedKey}
-              className="w-full font-mono text-xs rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-slate-800 outline-none focus:border-teal-600"
+              className="w-full font-mono text-xs rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-slate-800 outline-none focus:border-emerald-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
             />
             <button
               onClick={() => setShowKey(!showKey)}
-              className="absolute right-3 top-3 text-slate-400 hover:text-slate-600"
+              className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
               title={showKey ? "Hide key" : "Reveal key"}
             >
               {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -238,16 +238,16 @@ export default function ApiUsagePage() {
           </div>
           <Button
             onClick={handleCopy}
-            className="flex shrink-0 items-center gap-2 bg-slate-900 text-white hover:bg-slate-800"
+            className="flex shrink-0 items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 dark:text-slate-950 font-bold"
           >
-            {copied ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+            {copied ? <Check size={16} className="text-emerald-400 dark:text-slate-950" /> : <Copy size={16} />}
             {copied ? "Copied to clipboard" : "Copy API Key"}
           </Button>
         </div>
 
-        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500">
-          <ShieldCheck size={13} className="text-emerald-600" />
-          Pass your key in the header: <code className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-700">X-API-Key: {account?.apiKeyPrefix || "docu_live_"}...</code> or <code className="rounded bg-slate-100 px-1.5 py-0.5 text-slate-700">Authorization: Bearer &lt;key&gt;</code>
+        <div className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+          <ShieldCheck size={13} className="text-emerald-600 dark:text-emerald-400" />
+          Pass your key in the header: <code className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-slate-700 dark:text-slate-300">X-API-Key: {account?.apiKeyPrefix || "docu_live_"}...</code> or <code className="rounded bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 text-slate-700 dark:text-slate-300">Authorization: Bearer &lt;key&gt;</code>
         </div>
       </div>
 

@@ -25,7 +25,7 @@ export default function ProtectedLayout({
 
   if (!isDocs && (loading || !user)) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-zinc-50 ">
+      <div className="flex min-h-screen items-center justify-center bg-white dark:bg-[#090d12]">
         <Spinner size={24} />
       </div>
     );
@@ -33,7 +33,7 @@ export default function ProtectedLayout({
 
   if (isChat) {
     return (
-      <div className="h-screen flex flex-col bg-[#f6f8f9] lg:pl-[244px] overflow-hidden">
+      <div className="h-screen flex flex-col bg-slate-50/60 dark:bg-[#090d12] lg:pl-[244px] overflow-hidden text-slate-900 dark:text-slate-100 transition-colors">
         <Suspense fallback={null}>
           <Navbar />
         </Suspense>
@@ -45,7 +45,7 @@ export default function ProtectedLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f8f9] lg:pl-[244px]">
+    <div className="min-h-screen bg-slate-50/60 dark:bg-[#090d12] lg:pl-[244px] text-slate-900 dark:text-slate-100 transition-colors">
       <Suspense fallback={null}>
         <Navbar />
       </Suspense>

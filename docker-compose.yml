@@ -134,9 +134,12 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
+        BACKEND_URL: ${BACKEND_URL:-http://backend:8000}
     container_name: docuchat-frontend
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api}
       NEXT_PUBLIC_APP_NAME: DOCTool
       NEXTAUTH_URL: http://localhost:3000
     depends_on:

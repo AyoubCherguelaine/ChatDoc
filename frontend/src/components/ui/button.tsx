@@ -16,12 +16,12 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants = {
-  default: "bg-indigo-600 text-white hover:bg-indigo-700",
-  destructive: "bg-rose-600 text-white hover:bg-rose-700",
-  outline: "border border-zinc-300 bg-transparent hover:bg-zinc-100  ",
-  secondary: "bg-zinc-100 text-zinc-900 hover:bg-zinc-200  ",
-  ghost: "hover:bg-zinc-100 hover:text-zinc-900  ",
-  link: "text-indigo-600 underline-offset-4 hover:underline",
+  default: "bg-gradient-to-r from-teal-700 to-emerald-600 text-white hover:from-teal-800 hover:to-emerald-700 shadow-xs",
+  destructive: "bg-rose-600 text-white hover:bg-rose-700 shadow-xs",
+  outline: "border border-slate-300 bg-transparent text-slate-800 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 transition",
+  secondary: "bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition",
+  ghost: "text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100 transition",
+  link: "text-emerald-700 dark:text-emerald-400 underline-offset-4 hover:underline",
 };
 
 const sizes = {

@@ -307,22 +307,22 @@ export default function ChatPage({
         className={`grid flex-1 min-h-0 gap-3.5 overflow-hidden ${sourceOpen ? "xl:grid-cols-[minmax(0,1fr)_340px]" : "grid-cols-1"}`}
       >
         <section className="surface flex min-w-0 flex-1 flex-col overflow-hidden h-full">
-          <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-100 px-4 py-2">
-            <div className="mr-auto flex items-center gap-2 text-xs text-slate-500">
-              <span className="h-1.5 w-1.5 rounded-full bg-teal-500" /> Grounded
+          <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-100 dark:border-slate-800 px-4 py-2 bg-white dark:bg-[#121820]">
+            <div className="mr-auto flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Grounded
               in your document
             </div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setServiceModalOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 text-[11px] font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
+                className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition shadow-2xs"
               >
-                <Layers size={13} className="text-teal-600" />
+                <Layers size={13} className="text-emerald-600 dark:text-emerald-400" />
                 <span>Services (19)</span>
               </button>
-              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">
-                <Zap size={11} className="text-teal-600 fill-teal-600" />
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
+                <Zap size={11} className="text-emerald-600 fill-emerald-600 dark:text-emerald-400 dark:fill-emerald-400" />
                 {getServiceCost(mode)}c / call
               </span>
               <select
@@ -330,7 +330,7 @@ export default function ChatPage({
                 disabled={streaming}
                 value={mode}
                 onChange={(e) => setMode(e.target.value as ChatMode)}
-                className="rounded-md border border-slate-200 bg-white p-1 text-[11px]"
+                className="rounded-md border border-slate-200 bg-white p-1 text-[11px] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
               >
                 <option value="conversational">Document chat</option>
                 <option value="agent">Research agent</option>
@@ -365,14 +365,14 @@ export default function ChatPage({
                 />
               ))
             ) : (
-              <div className="mx-auto max-w-lg py-8">
-                <span className="mb-5 inline-flex rounded-2xl bg-[#eef5ed] p-4 text-teal-700">
+              <div className="mx-auto max-w-lg py-8 text-slate-900 dark:text-slate-100">
+                <span className="mb-5 inline-flex rounded-2xl bg-emerald-50 p-4 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">
                   <Sparkles size={29} />
                 </span>
-                <h2 className="text-2xl font-semibold tracking-tight">
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
                   What would you like to discover?
                 </h2>
-                <p className="mt-3 text-sm leading-7 text-slate-400">
+                <p className="mt-3 text-sm leading-7 text-slate-500 dark:text-slate-400">
                   Ask about {session.document.originalFilename}, or start with a
                   little inspiration.
                 </p>
@@ -381,13 +381,13 @@ export default function ChatPage({
                     <button
                       key={w.id}
                       onClick={() => apply(w.id)}
-                      className="rounded-xl border border-[#e2e9e4] p-4 text-left transition hover:border-teal-500 hover:bg-teal-50/20"
+                      className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-emerald-500 hover:bg-emerald-50/20 dark:border-slate-800 dark:bg-[#121820] dark:hover:bg-emerald-950/20"
                     >
-                      <span className="flex items-center justify-between text-xs font-semibold">
+                      <span className="flex items-center justify-between text-xs font-semibold text-slate-800 dark:text-slate-200">
                         {w.title}
-                        <ArrowUpRight size={13} className="text-teal-700" />
+                        <ArrowUpRight size={13} className="text-emerald-600 dark:text-emerald-400" />
                       </span>
-                      <span className="mt-2 block text-[11px] leading-5 text-slate-400">
+                      <span className="mt-2 block text-[11px] leading-5 text-slate-400 dark:text-slate-500">
                         {w.description}
                       </span>
                     </button>
@@ -396,7 +396,7 @@ export default function ChatPage({
               </div>
             )}
           </div>
-          <div className="shrink-0 border-t border-slate-100 p-3 sm:px-5 bg-white">
+          <div className="shrink-0 border-t border-slate-100 dark:border-slate-800 p-3 sm:px-5 bg-white dark:bg-[#121820]">
             {error && (
               <div
                 role="alert"
@@ -591,7 +591,7 @@ export default function ChatPage({
                   <PanelRightClose size={15} />
                 </button>
               </div>
-              <div className="my-2 flex shrink-0 items-center gap-2 rounded-lg bg-[#f5f7f4] p-2">
+              <div className="my-2 flex shrink-0 items-center gap-2 rounded-lg bg-slate-100 dark:bg-slate-800 p-2">
                 <FileText size={16} className="shrink-0 text-teal-700" />
                 <p
                   title={session.document.originalFilename}
