@@ -126,15 +126,44 @@ export interface AdvancedOcrResult {
   blocks: SemanticOcrBlock[];
 }
 
-export function extractAdvancedOcr(payload: {
-  document_id: string;
-  start_page: number;
-  end_page: number;
-  language: "auto" | "ar" | "en" | "mixed";
-}) {
+export interface AdvancedOcrParams {
+  file?: File | Blob;
+  document_id?: string;
+  start_page?: number;
+  end_page?: number;
+  language?: "auto" | "ar" | "en" | "mixed";
+}
+
+export function extractAdvancedOcr(payload: AdvancedOcrParams | FormData) {
+  if (typeof FormData !== "undefined" && payload instanceof FormData) {
+    return api<AdvancedOcrResult>("/v1/ocr/advanced", {
+      method: "POST",
+      body: payload,
+    });
+  }
+
+  const params = payload as AdvancedOcrParams;
+  if (params.file) {
+    const formData = new FormData();
+    formData.append("file", params.file);
+    if (params.start_page !== undefined) {
+      formData.append("start_page", String(params.start_page));
+    }
+    if (params.end_page !== undefined) {
+      formData.append("end_page", String(params.end_page));
+    }
+    if (params.language) {
+      formData.append("language", params.language);
+    }
+    return api<AdvancedOcrResult>("/v1/ocr/advanced", {
+      method: "POST",
+      body: formData,
+    });
+  }
+
   return api<AdvancedOcrResult>("/v1/ocr/advanced", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify(params),
   });
 }
 

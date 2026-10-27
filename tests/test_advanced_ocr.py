@@ -140,6 +140,42 @@ def test_endpoint_rejects_non_pdf(api_client, monkeypatch):
     assert client.post("/api/v1/ocr/advanced", json={"document_id": "doc"}).status_code == 422
 
 
+def test_endpoint_file_upload_success(api_client, monkeypatch):
+    client, routes = api_client
+    captured_paths = []
+
+    def mock_extract(self, path, start_page=1, end_page=None, language="auto"):
+        captured_paths.append(Path(path))
+        assert Path(path).exists()
+        return {"pages": [], "blocks": [], "block_count": 0}
+
+    monkeypatch.setattr(AdvancedOcrService, "extract", mock_extract)
+
+    response = client.post(
+        "/api/v1/ocr/advanced",
+        files={"file": ("sample.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        data={"start_page": "1", "end_page": "5", "language": "ar"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["filename"] == "sample.pdf"
+    assert data["document_id"] is None
+    # Ensure ephemeral file was cleaned up
+    assert len(captured_paths) == 1
+    assert not captured_paths[0].exists()
+
+
+def test_endpoint_file_upload_rejects_non_pdf(api_client):
+    client, _ = api_client
+    response = client.post(
+        "/api/v1/ocr/advanced",
+        files={"file": ("sample.txt", b"plain text", "text/plain")},
+    )
+    assert response.status_code == 422
+    assert "PDF document" in response.json()["detail"]
+
+
 def test_original_ocr_uses_semantics_and_keeps_full_transcription():
     from backend.agent.tools.ocr import OcrService
 

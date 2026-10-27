@@ -546,17 +546,106 @@ def _resolve_document_file_path(doc_id: str) -> tuple[Path, str]:
 
 
 @router.post("/ocr/advanced", summary="Advanced OCR: Flexible Semantic Page Blocks", tags=["Advanced OCR"])
-def pipeline_advanced_ocr(
-    payload: AdvancedOcrPayload,
+async def pipeline_advanced_ocr(
+    request: Request,
     account: CompanyAccount = CompanyAuth,
 ):
     """Extract semantic blocks in page order with free-form content and continuation links.
 
-    Uses vision on each selected page, without generating image crops. At most
-    50 pages per request. The first selected page has no predecessor context.
+    Supports direct ephemeral PDF upload (multipart/form-data) without saving to user drive storage,
+    as well as JSON payloads referencing existing document IDs.
+    At most 50 pages per request. The first selected page has no predecessor context.
     """
     from backend.agent.tools.advanced_ocr import AdvancedOcrService
     from backend.agent.tools.ocr import OcrError
+
+    content_type = request.headers.get("content-type", "")
+
+    if "multipart/form-data" in content_type:
+        form = await request.form()
+        uploaded_file = form.get("file")
+        if uploaded_file and hasattr(uploaded_file, "filename"):
+            filename = Path((uploaded_file.filename or "document.pdf").replace("\\", "/")).name
+            if Path(filename).suffix.lower() != ".pdf":
+                raise HTTPException(status_code=422, detail="Advanced OCR requires a PDF document")
+
+            raw_bytes = await uploaded_file.read(50 * 1024 * 1024 + 1)
+            if not raw_bytes or len(raw_bytes) > 50 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="PDF size must be between 1 byte and 50 MB.")
+
+            try:
+                start_page = int(form.get("start_page", 1))
+                if start_page < 1:
+                    raise ValueError("start_page must be >= 1")
+            except (ValueError, TypeError):
+                raise HTTPException(status_code=422, detail="start_page must be an integer >= 1")
+
+            end_page = None
+            raw_end = form.get("end_page")
+            if raw_end is not None and str(raw_end).strip() != "":
+                try:
+                    end_page = int(raw_end)
+                    if end_page < start_page:
+                        raise ValueError("end_page must be >= start_page")
+                except (ValueError, TypeError):
+                    raise HTTPException(status_code=422, detail="end_page must be an integer >= start_page")
+
+            language = str(form.get("language", "auto")).lower()
+            if language not in ("auto", "ar", "en", "mixed"):
+                language = "auto"
+
+            # Ephemeral Document AI processing: not saved to user documents or permanent storage
+            with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+                tmp.write(raw_bytes)
+                tmp_path = Path(tmp.name)
+
+            try:
+                data = await run_in_threadpool(
+                    AdvancedOcrService().extract,
+                    tmp_path,
+                    start_page=start_page,
+                    end_page=end_page,
+                    language=language,
+                )
+                return {
+                    **data,
+                    "status": "success",
+                    "document_id": None,
+                    "filename": filename,
+                }
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+            except OcrError as exc:
+                logger.warning("Advanced OCR failed for uploaded file %s: %s", filename, exc)
+                raise HTTPException(status_code=502, detail=str(exc)) from exc
+            finally:
+                if tmp_path.exists():
+                    tmp_path.unlink(missing_ok=True)
+
+        doc_id = form.get("document_id")
+        if not doc_id:
+            raise HTTPException(status_code=422, detail="Either a PDF 'file' or 'document_id' must be provided.")
+        try:
+            start_page = int(form.get("start_page", 1))
+        except (ValueError, TypeError):
+            start_page = 1
+        end_page = int(form.get("end_page")) if form.get("end_page") else None
+        language = str(form.get("language", "auto"))
+        payload = AdvancedOcrPayload(
+            document_id=str(doc_id),
+            start_page=start_page,
+            end_page=end_page,
+            language=language if language in ("auto", "ar", "en", "mixed") else "auto",
+        )
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            raise HTTPException(status_code=400, detail="Invalid JSON payload")
+        try:
+            payload = AdvancedOcrPayload(**body)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
 
     document = query(
         "SELECT id, original_filename FROM docuchat.documents WHERE id = %s AND user_id = %s",
@@ -568,8 +657,12 @@ def pipeline_advanced_ocr(
         raise HTTPException(status_code=422, detail="Advanced OCR requires a PDF document")
     file_path, filename = _resolve_document_file_path(payload.document_id)
     try:
-        data = AdvancedOcrService().extract(
-            file_path, start_page=payload.start_page, end_page=payload.end_page, language=payload.language,
+        data = await run_in_threadpool(
+            AdvancedOcrService().extract,
+            file_path,
+            start_page=payload.start_page,
+            end_page=payload.end_page,
+            language=payload.language,
         )
         return {**data, "status": "success", "document_id": payload.document_id, "filename": filename}
     except ValueError as exc:
