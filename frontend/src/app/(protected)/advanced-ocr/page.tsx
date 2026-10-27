@@ -1,4 +1,5 @@
 "use client";
+import { getUploadSizeError, UPLOAD_LIMIT_LABEL } from "@/lib/upload-limits";
 
 import { useState, useRef, useId } from "react";
 import {
@@ -88,8 +89,9 @@ export default function AdvancedOcrPage() {
       setError("Please select a valid PDF file. Other file formats are not supported for PDF OCR.");
       return;
     }
-    if (candidate.size > 50 * 1024 * 1024) {
-      setError("File exceeds the 50 MB maximum upload size.");
+    const sizeError = getUploadSizeError(candidate);
+    if (sizeError) {
+      setError(sizeError);
       return;
     }
     setFile(candidate);
@@ -122,16 +124,16 @@ export default function AdvancedOcrPage() {
       setError("Please upload a PDF file to run OCR extraction.");
       return;
     }
-    if (startPage < 1) {
-      setError("Start page must be at least 1.");
+    if (startPage < 1 || startPage > 3) {
+      setError("Start page must be between 1 and 3.");
       return;
     }
     if (typeof endPage === "number" && endPage < startPage) {
       setError("End page must be greater than or equal to start page.");
       return;
     }
-    if (typeof endPage === "number" && endPage - startPage + 1 > 50) {
-      setError("Select at most 50 pages per request.");
+    if (typeof endPage === "number" && endPage > 3) {
+      setError("Documents are limited to 3 pages.");
       return;
     }
 
@@ -284,7 +286,7 @@ export default function AdvancedOcrPage() {
                 Click or drag &amp; drop a PDF here
               </p>
               <p className="mt-1 text-xs text-slate-500">
-                Supports any PDF document up to 50 MB
+                PDF documents • {UPLOAD_LIMIT_LABEL}
               </p>
               <input
                 id={fileInputId}
@@ -368,6 +370,7 @@ export default function AdvancedOcrPage() {
               disabled={busy}
               type="number"
               min={1}
+              max={3}
               value={startPage}
               onChange={(e) => setStartPage(Math.max(1, Number(e.target.value) || 1))}
               className={fieldClass}
@@ -380,7 +383,8 @@ export default function AdvancedOcrPage() {
               disabled={busy}
               type="number"
               min={startPage}
-              placeholder="e.g. 10 (default: all up to 50)"
+              max={3}
+              placeholder="e.g. 3 (default: all pages)"
               value={endPage}
               onChange={(e) => {
                 const val = e.target.value;
@@ -410,7 +414,7 @@ export default function AdvancedOcrPage() {
         <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3.5 text-xs text-slate-500 dark:bg-slate-900/60 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
           <FileCheck2 size={16} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
           <span>
-            Processes up to 50 pages per run. Content adapts to your document layout, preserving reading
+            Uploads are limited to 5 MB and 3 pages. Content adapts to your document layout, preserving reading
             continuity across page breaks. Stateless Document AI processing — your files are processed ephemerally and never saved.
           </span>
         </div>

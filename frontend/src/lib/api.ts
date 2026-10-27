@@ -1,3 +1,5 @@
+import { getUploadSizeError } from "./upload-limits";
+
 const BASE = (
   process.env.NEXT_PUBLIC_API_URL || "/api"
 ).replace(/\/+$/, "");
@@ -134,8 +136,11 @@ export interface AdvancedOcrParams {
   language?: "auto" | "ar" | "en" | "mixed";
 }
 
-export function extractAdvancedOcr(payload: AdvancedOcrParams | FormData) {
+export async function extractAdvancedOcr(payload: AdvancedOcrParams | FormData) {
   if (typeof FormData !== "undefined" && payload instanceof FormData) {
+    const file = payload.get("file");
+    const error = file instanceof Blob ? getUploadSizeError(file) : null;
+    if (error) throw new ApiError(413, error);
     return api<AdvancedOcrResult>("/v1/ocr/advanced", {
       method: "POST",
       body: payload,
@@ -144,6 +149,8 @@ export function extractAdvancedOcr(payload: AdvancedOcrParams | FormData) {
 
   const params = payload as AdvancedOcrParams;
   if (params.file) {
+    const error = getUploadSizeError(params.file);
+    if (error) throw new ApiError(413, error);
     const formData = new FormData();
     formData.append("file", params.file);
     if (params.start_page !== undefined) {
@@ -167,7 +174,9 @@ export function extractAdvancedOcr(payload: AdvancedOcrParams | FormData) {
   });
 }
 
-export function uploadDocument(file: File, options?: { maxPages?: number }) {
+export async function uploadDocument(file: File, options?: { maxPages?: number }) {
+  const error = getUploadSizeError(file);
+  if (error) throw new ApiError(413, error);
   const form = new FormData();
   form.append("file", file);
   if (options?.maxPages) {
@@ -257,6 +266,7 @@ export function fetchCapabilities() {
     defaultModel: string;
     formats: string[];
     maxUploadMB: number;
+    maxPages: number;
   }>("/capabilities");
 }
 
@@ -603,4 +613,3 @@ export function deleteDocumentSession(docId: string) {
     method: "DELETE",
   });
 }
-

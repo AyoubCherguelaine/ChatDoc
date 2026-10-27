@@ -72,8 +72,8 @@ def test_ingestion_reports_storage_failure(tmp_path, monkeypatch):
     from backend.config import settings
     from backend.storage import storage_service
 
-    source = tmp_path / "source.pdf"
-    source.write_bytes(b"%PDF-test")
+    source = tmp_path / "source.txt"
+    source.write_text("A readable document")
     monkeypatch.setattr(settings, "UPLOAD_DIR", str(tmp_path / "uploads"))
     monkeypatch.setattr(settings, "INDEX_DIR", str(tmp_path / "indexes"))
 
@@ -82,5 +82,5 @@ def test_ingestion_reports_storage_failure(tmp_path, monkeypatch):
 
     monkeypatch.setattr(storage_service, "upload", unavailable)
     with pytest.raises(EndpointConnectionError):
-        rag.process_upload("user-test", source, "source.pdf", source.stat().st_size, "application/pdf")
+        rag.process_upload("user-test", source, "source.txt", source.stat().st_size, "text/plain")
     assert list((tmp_path / "uploads").iterdir()) == []

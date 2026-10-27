@@ -1,4 +1,5 @@
 "use client";
+import { getUploadSizeError, UPLOAD_LIMIT_LABEL } from "@/lib/upload-limits";
 
 import { useState, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
@@ -122,8 +123,9 @@ export function ServiceLauncherModal({
       setUploadError("Choose a PDF, Word (.docx), Excel (.xlsx / .xls), CSV, TXT, or Markdown file.");
       return;
     }
-    if (!f.size || f.size > 25 * 1024 * 1024) {
-      setUploadError("Choose a file between 1 byte and 25 MB.");
+    const sizeError = getUploadSizeError(f);
+    if (sizeError) {
+      setUploadError(sizeError);
       return;
     }
     setLocalFile(f);
@@ -567,7 +569,7 @@ export function ServiceLauncherModal({
                       </button>
                     </p>
                     <p className="mt-1 text-[10px] text-slate-400">
-                      PDF, DOCX, XLSX, CSV, TXT, or MD (up to 25 MB)
+                      PDF, DOCX, XLSX, CSV, TXT, or MD ({UPLOAD_LIMIT_LABEL})
                     </p>
                     <input
                       ref={fileInputRef}

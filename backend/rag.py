@@ -49,6 +49,7 @@ from backend.agent.tools.document_tools import DocumentToolKit
 from backend.agent.tools.enhanced import EnhancedDocumentKit
 from backend.chat.chatWithVSDB import get_conversation_chain, get_llm
 from backend.documents.loader import load_document
+from backend.documents.limits import MAX_DOCUMENT_PAGES, validate_page_count, validate_upload_size
 from backend.documents.processors import DocumentProcessor, ProcessingConfig
 from backend.embeddings.smart_embedding import SmartEmbedding, SmartEmbeddingConfig
 from backend.embeddings.vectoreStore import SmartVectorStore
@@ -129,11 +130,15 @@ class UploadResult(tuple):
         return instance
 
 
-def process_upload(user_id: str, file_path: Path, original_filename: str, file_size: int, mime: str) -> UploadResult:
+def process_upload(
+    user_id: str, file_path: Path, original_filename: str, file_size: int, mime: str,
+    max_pages: int = MAX_DOCUMENT_PAGES,
+) -> UploadResult:
     """Process an uploaded document: chunk, embed-index, persist chunks.
 
     Returns UploadResult(chunk_count, page_count, document_id).
     """
+    validate_upload_size(file_path.stat().st_size)
     _ensure_dirs()
     doc_id = str(uuid.uuid4())
 
@@ -147,7 +152,6 @@ def process_upload(user_id: str, file_path: Path, original_filename: str, file_s
     try:
         shutil.copyfile(file_path, dest)
         from backend.storage import storage_service
-        storage_service.upload(f"documents/{doc_id}/{original_filename}", file_path, content_type=mime)
         try:
             pdf_doc = load_document(dest)
         except ValueError:
@@ -155,6 +159,8 @@ def process_upload(user_id: str, file_path: Path, original_filename: str, file_s
         except Exception as exc:
             raise ValueError("This file could not be read. Check that it is a valid, unencrypted document.") from exc
         page_count = pdf_doc.total_pages
+        validate_page_count(page_count, max_pages)
+        storage_service.upload(f"documents/{doc_id}/{original_filename}", file_path, content_type=mime)
         processor = DocumentProcessor(
             ProcessingConfig(
                 use_semantic_split=True,

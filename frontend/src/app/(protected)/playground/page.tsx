@@ -1,4 +1,5 @@
 "use client";
+import { UPLOAD_LIMIT_LABEL } from "@/lib/upload-limits";
 
 import { useEffect, useState, useMemo } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -771,7 +772,7 @@ console.log("TTL Status:", status);`;
                   }`}
                 >
                   <p className="text-[11px] text-slate-500">
-                    Drag &amp; drop PDF or document here • Automatic layout OCR enabled
+                    Drag &amp; drop PDF or document here • {UPLOAD_LIMIT_LABEL}
                   </p>
                 </div>
 
@@ -1400,7 +1401,7 @@ console.log("TTL Status:", status);`;
                           <td className="px-3.5 py-2 font-mono font-bold text-slate-900">file</td>
                           <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">binary (form)</td>
                           <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
-                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">PDF or document (up to 50 MB).</td>
+                          <td className="px-3.5 py-2 text-slate-600 text-[11px]">PDF or document (up to 5 MB and 3 pages).</td>
                         </tr>
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3.5 py-2 font-mono font-bold text-slate-900">ttl_minutes</td>

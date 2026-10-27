@@ -1,4 +1,5 @@
 "use client";
+import { UPLOAD_LIMIT_LABEL } from "@/lib/upload-limits";
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -283,8 +284,8 @@ export default function AgentsPage() {
       };
       setDocs((prev) => [newDoc, ...prev]);
       setSelectedDocId(newDoc.id);
-    } catch {
-      setUploadError("Failed to upload document. Please try again.");
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Failed to upload document. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -412,6 +413,8 @@ export default function AgentsPage() {
               </div>
             )}
           </div>
+
+          <p className="text-xs text-slate-500">{UPLOAD_LIMIT_LABEL}</p>
 
           {/* Search agents input */}
           <div className="relative w-full lg:w-72">

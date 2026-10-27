@@ -167,7 +167,7 @@ export const DOCS_CATEGORIES: DocCategory[] = [
         llmTier: "Ingestion Engine",
         badge: "10-Min Session",
         description:
-          "Upload a PDF or document up to 50 MB. Extracts text chunks, builds ephemeral vector embeddings, registers the document in memory, and starts the 10-minute sliding countdown.",
+          "Upload a PDF or document up to 5 MB and 3 pages. Extracts text chunks, builds ephemeral vector embeddings, registers the document in memory, and starts the 10-minute sliding countdown.",
         capabilities: [
           "Supports PDF, DOCX, TXT, CSV, and scanned image formats",
           "Returns a documentId to chain multiple Document AI services",

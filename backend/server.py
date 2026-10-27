@@ -34,6 +34,7 @@ from backend.billing import (
     billing_service,
 )
 from backend.documents.loader import SUPPORTED_EXTENSIONS
+from backend.documents.limits import MAX_DOCUMENT_PAGES, MAX_UPLOAD_BYTES, MAX_UPLOAD_MB
 from backend.jobs import job_queue, start_background_worker
 from backend.mcp.server import mcp_server
 from backend.storage import storage_service
@@ -187,26 +188,12 @@ async def upload_document(
             detail="Supported formats: PDF, DOCX, XLSX, XLS, CSV, TXT, MD.",
         )
 
-    raw = await file.read(25 * 1024 * 1024 + 1)
-    if not raw or len(raw) > 25 * 1024 * 1024:
-        raise HTTPException(413, "Choose a non-empty file up to 25 MB.")
+    raw = await file.read(MAX_UPLOAD_BYTES + 1)
+    if not raw or len(raw) > MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "Choose a non-empty file up to 5 MB.")
     file_size = len(raw)
 
-    # Pre-validation for PDF page count limit if max_pages is specified
-    if ext == ".pdf" and max_pages is not None and max_pages > 0:
-        try:
-            import pypdf
-            reader = pypdf.PdfReader(io.BytesIO(raw))
-            pdf_page_count = len(reader.pages)
-            if pdf_page_count > max_pages:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"This document has {pdf_page_count} pages, which exceeds the maximum limit of {max_pages} pages for chat. Please upload a document with at most {max_pages} pages.",
-                )
-        except HTTPException:
-            raise
-        except Exception as exc:
-            logging.debug("Pre-flight PDF page check skipped: %s", exc)
+    page_limit = min(max_pages, MAX_DOCUMENT_PAGES) if max_pages and max_pages > 0 else MAX_DOCUMENT_PAGES
 
     suffix = ext
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -221,11 +208,12 @@ async def upload_document(
             original_filename=filename,
             file_size=file_size,
             mime=file.content_type or "application/octet-stream",
+            max_pages=page_limit,
         )
         chunk_count, page_count = upload_result[0], upload_result[1]
         doc_id = getattr(upload_result, "document_id", None)
 
-        if max_pages is not None and max_pages > 0 and page_count > max_pages:
+        if page_count > page_limit:
             # Cleanup document
             try:
                 from backend.db import get_conn
@@ -237,7 +225,7 @@ async def upload_document(
                 pass
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"This document has {page_count} pages, which exceeds the maximum limit of {max_pages} pages for chat. Please upload a document with at most {max_pages} pages.",
+                detail=f"This document has {page_count} pages, which exceeds the maximum limit of {page_limit} pages for chat. Please upload a document with at most {page_limit} pages.",
             )
     except ValueError as exc:
         raise HTTPException(422, str(exc)) from exc
@@ -549,7 +537,8 @@ def capabilities(user: CurrentUser):
         "models": settings.CHAT_MODELS,
         "defaultModel": settings.DEFAULT_MODEL,
         "formats": sorted(SUPPORTED_EXTENSIONS),
-        "maxUploadMB": 25,
+        "maxUploadMB": MAX_UPLOAD_MB,
+        "maxPages": MAX_DOCUMENT_PAGES,
     }
 
 

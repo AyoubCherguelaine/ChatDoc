@@ -1,4 +1,5 @@
 "use client";
+import { getUploadSizeError, UPLOAD_LIMIT_LABEL } from "@/lib/upload-limits";
 import { useState, useRef } from "react";
 import { UploadCloud, FileText, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,8 +21,8 @@ export function UploadForm({ onDone }: { onDone: () => void }) {
       return setError(
         "Choose a PDF, Word (.docx), Excel (.xlsx / .xls), CSV, TXT, or Markdown file.",
       );
-    if (!next.size || next.size > 25 * 1024 * 1024)
-      return setError("Choose a non-empty file up to 25 MB.");
+    const sizeError = getUploadSizeError(next);
+    if (sizeError) return setError(sizeError);
     setFile(next);
   };
   const upload = async () => {
@@ -79,7 +80,7 @@ export function UploadForm({ onDone }: { onDone: () => void }) {
           onChange={(e) => select(e.target.files?.[0] ?? null)}
         />
         <p className="mt-4 text-[10px] text-slate-400">
-          PDF · DOCX · XLSX · XLS · CSV · TXT · MD &nbsp; / &nbsp; Up to 25 MB
+          PDF · DOCX · XLSX · XLS · CSV · TXT · MD &nbsp; / &nbsp; {UPLOAD_LIMIT_LABEL}
         </p>
       </div>
       {file && (

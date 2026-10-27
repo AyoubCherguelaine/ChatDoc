@@ -117,7 +117,7 @@ def test_endpoint_rejects_invalid_page_range(api_client):
     client, _ = api_client
     response = client.post(
         "/api/v1/ocr/advanced",
-        files={"file": ("sample.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        files={"file": ("sample.pdf", sample_pdf(), "application/pdf")},
         data={"start_page": "0"},
     )
     assert response.status_code == 422
@@ -129,7 +129,7 @@ def test_endpoint_errors(api_client, monkeypatch, error, code):
     monkeypatch.setattr(AdvancedOcrService, "extract", MagicMock(side_effect=error))
     response = client.post(
         "/api/v1/ocr/advanced",
-        files={"file": ("sample.pdf", b"%PDF-1.4 mock content", "application/pdf")},
+        files={"file": ("sample.pdf", sample_pdf(), "application/pdf")},
     )
     assert response.status_code == code
 
@@ -147,8 +147,8 @@ def test_endpoint_file_upload_success(api_client, monkeypatch):
 
     response = client.post(
         "/api/v1/ocr/advanced",
-        files={"file": ("sample.pdf", b"%PDF-1.4 mock content", "application/pdf")},
-        data={"start_page": "1", "end_page": "5", "language": "ar"},
+        files={"file": ("sample.pdf", sample_pdf(), "application/pdf")},
+        data={"start_page": "1", "end_page": "3", "language": "ar"},
     )
     assert response.status_code == 200
     data = response.json()
@@ -247,7 +247,7 @@ def test_ephemeral_document_ttl_and_multi_service(api_client, monkeypatch):
     # Upload document
     resp = client.post(
         "/api/v1/ocr/advanced",
-        files={"file": ("invoice_ttl.pdf", b"%PDF-1.4 sample invoice", "application/pdf")},
+        files={"file": ("invoice_ttl.pdf", sample_pdf(), "application/pdf")},
     )
     assert resp.status_code == 200
     doc_id = resp.json()["document_id"]
@@ -271,3 +271,15 @@ def test_ephemeral_document_ttl_and_multi_service(api_client, monkeypatch):
     # Status check now returns 410 Gone
     expired_resp = client.get(f"/api/v1/documents/{doc_id}/status")
     assert expired_resp.status_code == 410
+
+
+def sample_pdf():
+    from io import BytesIO
+    from pypdf import PdfWriter
+
+    stream = BytesIO()
+    writer = PdfWriter()
+    for _ in range(3):
+        writer.add_blank_page(width=100, height=100)
+    writer.write(stream)
+    return stream.getvalue()

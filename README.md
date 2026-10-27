@@ -817,7 +817,7 @@ The public `/` route is now a landing page. Sign in or create an account at `/lo
 
 ### Supported files
 
-Upload PDF, Word **DOCX**, Excel **XLSX / XLS**, CSV, TXT, or Markdown files up to **25 MB**. Word tables are included in document order. Excel worksheet names and original row numbers are preserved; large sheets use sections of 150 nonempty rows. Formula text is retained in XLSX and is **not executed or recalculated**. Old binary Word `.doc` files must be saved as `.docx` first. Scanned PDF images need OCR before upload; image OCR is not included.
+Upload PDF, Word **DOCX**, Excel **XLSX / XLS**, CSV, TXT, or Markdown files up to **5 MB and 3 pages** across all services, including Advanced OCR and API uploads. PDFs use their actual page count; other formats use the extracted sections shown in the document reader. Documents over either limit are rejected. Word tables are included in document order. Excel worksheet names and original row numbers are preserved; large sheets use sections of 150 nonempty rows. Formula text is retained in XLSX and is **not executed or recalculated**. Old binary Word `.doc` files must be saved as `.docx` first. Scanned PDF images need OCR before upload; image OCR is not included.
 
 PDF citations refer to physical pages. Word/text citations refer to logical text sections, and spreadsheet citations refer to worksheet sections, not printed pages. The source panel displays extracted text rather than a visual Office/PDF renderer. The research agent searches and reads the selected document; it does not browse the web.
 

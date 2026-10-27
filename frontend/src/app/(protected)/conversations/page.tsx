@@ -1,4 +1,5 @@
 "use client";
+import { getUploadSizeError, UPLOAD_LIMIT_LABEL } from "@/lib/upload-limits";
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
@@ -87,9 +88,9 @@ export default function ConversationsPage() {
       setModalError("Supported formats: PDF, DOCX, TXT, CSV, XLSX.");
       return;
     }
-    // Limit file size to 25MB
-    if (file.size > 25 * 1024 * 1024) {
-      setModalError("File size exceeds 25MB limit.");
+    const sizeError = getUploadSizeError(file);
+    if (sizeError) {
+      setModalError(sizeError);
       return;
     }
     setSelectedFile(file);
@@ -314,7 +315,7 @@ export default function ConversationsPage() {
                     Click to browse or drop your document here
                   </p>
                   <p className="mt-1 text-[11px] text-slate-400 dark:text-slate-500">
-                    PDF, DOCX, CSV, XLSX, TXT (Max 25MB • Up to 3 pages)
+                    PDF, DOCX, CSV, XLSX, TXT ({UPLOAD_LIMIT_LABEL})
                   </p>
                 </div>
               ) : (
@@ -361,7 +362,7 @@ export default function ConversationsPage() {
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-2.5 text-[11px] text-slate-500 dark:border-slate-800 dark:bg-slate-900/60 dark:text-slate-400 leading-relaxed flex items-start gap-2">
               <ShieldCheck size={14} className="text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
               <span>
-                Conversations are strictly optimized for rapid interactive Q&amp;A on short documents (up to 3 pages). For 50+ page documents, please use <strong>Advanced OCR</strong>.
+                Conversations are strictly optimized for rapid interactive Q&amp;A on short documents (up to 3 pages). All services, including Advanced OCR, use the same 5 MB and 3-page upload limits.
               </span>
             </div>
 

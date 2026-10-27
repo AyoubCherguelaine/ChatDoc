@@ -104,6 +104,7 @@ export default function ChatPage({
   const [serviceCategory, setServiceCategory] = useState<string>("All");
   const scroll = useRef<HTMLDivElement>(null);
   const abort = useRef<AbortController | null>(null);
+  const messageSequence = useRef(0);
   useEffect(() => {
     let active = true;
     fetchSession(sessionId)
@@ -168,15 +169,16 @@ export default function ChatPage({
       behavior: "smooth",
     });
   }, [messages]);
-  const send = async (text: string) => {
+  const send = async (text: string, selectedMode: ChatMode = mode) => {
     if (streaming) return;
     setError("");
     const now = new Date().toISOString();
-    const id = crypto.randomUUID();
+    // Optimistic message IDs are local UI keys, including on plain HTTP hosts.
+    const id = `local-${sessionId}-${Date.now()}-${messageSequence.current++}`;
     setMessages((m) => [
       ...m,
       {
-        id: crypto.randomUUID(),
+        id: `${id}-user`,
         sessionId,
         role: "user",
         content: text,
@@ -189,7 +191,7 @@ export default function ChatPage({
     abort.current = controller;
     let acc = "";
     try {
-      for await (const chunk of streamChat(sessionId, text, mode, {
+      for await (const chunk of streamChat(sessionId, text, selectedMode, {
         model: model || undefined,
         responseStyle: style,
         signal: controller.signal,
@@ -423,7 +425,7 @@ export default function ChatPage({
                 disabled={streaming}
                 onClick={() => {
                   setMode("invoice");
-                  send("Extract all structured invoice fields: vendor, invoice date, line items, VAT, and total payment amounts.");
+                  send("Extract all structured invoice fields: vendor, invoice date, line items, VAT, and total payment amounts.", "invoice");
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50 transition shadow-2xs disabled:opacity-50"
               >
@@ -434,7 +436,7 @@ export default function ChatPage({
                 disabled={streaming}
                 onClick={() => {
                   setMode("summary");
-                  send("Generate an executive summary of this document with key findings, metrics, and actionable takeaways.");
+                  send("Generate an executive summary of this document with key findings, metrics, and actionable takeaways.", "summary");
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50 transition shadow-2xs disabled:opacity-50"
               >
@@ -445,7 +447,7 @@ export default function ChatPage({
                 disabled={streaming}
                 onClick={() => {
                   setMode("contract");
-                  send("Perform complete legal contract analysis: liabilities, governing jurisdiction, termination clauses, and risks.");
+                  send("Perform complete legal contract analysis: liabilities, governing jurisdiction, termination clauses, and risks.", "contract");
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50 transition shadow-2xs disabled:opacity-50"
               >
@@ -456,7 +458,7 @@ export default function ChatPage({
                 disabled={streaming}
                 onClick={() => {
                   setMode("compliance");
-                  send("Audit this document for sensitive PII, GDPR/HIPAA compliance risks, and privacy issues.");
+                  send("Audit this document for sensitive PII, GDPR/HIPAA compliance risks, and privacy issues.", "compliance");
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50 transition shadow-2xs disabled:opacity-50"
               >
@@ -737,7 +739,7 @@ export default function ChatPage({
                         onClick={() => {
                           setMode(svc.id);
                           setServiceModalOpen(false);
-                          send(svc.prompt);
+                          send(svc.prompt, svc.id);
                         }}
                         className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-teal-700 transition disabled:opacity-50"
                       >

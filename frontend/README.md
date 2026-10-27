@@ -9,6 +9,8 @@ npm run dev
 
 Open http://localhost:3000. Start the FastAPI backend on port 8000 and PostgreSQL using the root README instructions. `NEXT_PUBLIC_API_URL` defaults to `/api`, so browser requests use the frontend origin. Next.js forwards them to `BACKEND_URL` (default `http://127.0.0.1:8000`). Set these values in `.env.local` before building when using a different API address.
 
+Uploads across the drive, chat, services, AI studio, and Advanced OCR are limited to 5 MB and 3 pages. For non-PDF formats, the page limit uses the extracted sections shown by the document reader. The backend rejects oversized documents before storage, embeddings, or OCR.
+
 ## Routes
 
 | Route | Purpose |

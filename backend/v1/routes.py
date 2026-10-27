@@ -44,6 +44,9 @@ from backend.billing import (
 from backend.config import settings
 from backend.db import query
 from backend.documents.loader import SUPPORTED_EXTENSIONS
+from backend.documents.limits import (
+    MAX_UPLOAD_BYTES, UploadSizeError, validate_pdf_pages, validate_upload_size,
+)
 from backend.jobs import job_queue
 from backend.storage import storage_service
 from backend.storage.ephemeral import ephemeral_store
@@ -326,9 +329,9 @@ async def pipeline_upload_document(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Unsupported format '{ext}'. Supported: {', '.join(SUPPORTED_EXTENSIONS)}",
             )
-        raw_bytes = await uploaded_file.read(50 * 1024 * 1024 + 1)
-        if not raw_bytes or len(raw_bytes) > 50 * 1024 * 1024:
-            raise HTTPException(413, "Document size must be between 1 byte and 50 MB.")
+        raw_bytes = await uploaded_file.read(MAX_UPLOAD_BYTES + 1)
+        if not raw_bytes or len(raw_bytes) > MAX_UPLOAD_BYTES:
+            raise HTTPException(413, "Document size must be between 1 byte and 5 MB.")
         mime_type = uploaded_file.content_type or "application/octet-stream"
         raw_ttl = form.get("ttl_minutes")
         if raw_ttl:
@@ -343,6 +346,11 @@ async def pipeline_upload_document(
             raise HTTPException(400, "Empty upload payload.")
         filename = request.headers.get("X-Filename", "document.txt")
         mime_type = content_type or "application/octet-stream"
+
+    try:
+        validate_upload_size(len(raw_bytes))
+    except UploadSizeError as exc:
+        raise HTTPException(413, str(exc)) from exc
 
     file_size = len(raw_bytes)
     ext = Path(filename).suffix.lower() or ".txt"
@@ -632,7 +640,7 @@ async def pipeline_advanced_ocr(
     Stateless ephemeral Document AI: documents are retained for 10 minutes without usage.
     Each usage resets the 10-minute inactivity timer. After 10 minutes of inactivity,
     files and resources are automatically purged.
-    At most 50 pages per request. The first selected page has no predecessor context.
+    Documents are limited to 5 MB and 3 pages, including when selecting a page range. The first selected page has no predecessor context.
     """
     from backend.agent.tools.advanced_ocr import AdvancedOcrService
     from backend.agent.tools.ocr import OcrError
@@ -716,9 +724,14 @@ async def pipeline_advanced_ocr(
             if Path(raw_filename).suffix.lower() != ".pdf":
                 raise HTTPException(status_code=422, detail="Advanced OCR requires a PDF document")
 
-            raw_bytes = await uploaded_file.read(50 * 1024 * 1024 + 1)
-            if not raw_bytes or len(raw_bytes) > 50 * 1024 * 1024:
-                raise HTTPException(status_code=413, detail="PDF size must be between 1 byte and 50 MB.")
+            raw_bytes = await uploaded_file.read(MAX_UPLOAD_BYTES + 1)
+            if not raw_bytes or len(raw_bytes) > MAX_UPLOAD_BYTES:
+                raise HTTPException(status_code=413, detail="PDF size must be between 1 byte and 5 MB.")
+
+            try:
+                validate_pdf_pages(raw_bytes)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc)) from exc
 
             # Store in ephemeral store with sliding inactivity TTL (default 10 min)
             try:
@@ -769,6 +782,8 @@ async def pipeline_advanced_ocr(
         raise HTTPException(status_code=422, detail="Unable to resolve document file path.")
 
     try:
+        validate_upload_size(target_path.stat().st_size)
+        validate_pdf_pages(target_path)
         data = await run_in_threadpool(
             AdvancedOcrService().extract,
             target_path,
@@ -785,6 +800,8 @@ async def pipeline_advanced_ocr(
             "remaining_seconds": e_doc.remaining_seconds if e_doc else None,
             "expires_at": e_doc.expires_at.isoformat() if e_doc else None,
         }
+    except UploadSizeError as exc:
+        raise HTTPException(status_code=413, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except OcrError as exc:

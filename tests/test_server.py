@@ -24,7 +24,8 @@ def test_capabilities_only_offer_configured_models(client):
     result = client.get("/api/capabilities").json()
     assert result["defaultModel"] in result["models"]
     assert {".pdf", ".docx", ".xlsx", ".xls"} <= set(result["formats"])
-    assert result["maxUploadMB"] == 25
+    assert result["maxUploadMB"] == 5
+    assert result["maxPages"] == 3
 
 
 def test_reject_unknown_model_before_saving_message(client, monkeypatch):
@@ -102,7 +103,7 @@ def test_upload_rejects_unsupported_empty_and_oversize(client):
     for filename, content, status in [
         ("image.png", b"image", 400),
         ("empty.txt", b"", 413),
-        ("large.txt", b"x" * (25 * 1024 * 1024 + 1), 413),
+        ("large.txt", b"x" * (5 * 1024 * 1024 + 1), 413),
     ]:
         result = client.post("/api/documents/upload", files={"file": (filename, content)})
         assert result.status_code == status

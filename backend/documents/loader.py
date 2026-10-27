@@ -4,6 +4,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from .pdf_loader import PageText, PDFDocument, load_pdf
+from .limits import validate_page_count, validate_pdf_pages, validate_upload_size
 
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".xls", ".csv", ".txt", ".md"}
 MAX_TEXT_CHARS = 5_000_000
@@ -14,7 +15,9 @@ def load_document(file_path: str | Path) -> PDFDocument:
     ext = path.suffix.lower()
     if ext not in SUPPORTED_EXTENSIONS:
         raise ValueError("Supported formats: PDF, DOCX, XLSX, XLS, CSV, TXT, MD.")
+    validate_upload_size(path.stat().st_size)
     if ext == ".pdf":
+        validate_pdf_pages(path)
         result = load_pdf(str(path))
         if not any(p.text.strip() for p in result.pages):
             # Automatically run OCR on scanned or non-text PDFs
@@ -94,6 +97,7 @@ def load_document(file_path: str | Path) -> PDFDocument:
         raise ValueError("Document exceeds the 5 million character limit.")
     if not any(s.strip() for s in sections):
         raise ValueError("No readable content found in this file.")
+    validate_page_count(len(sections))
     return PDFDocument(
         name=path.name,
         file_path=str(path),
