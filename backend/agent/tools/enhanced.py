@@ -453,6 +453,36 @@ class EnhancedDocumentKit:
                 )
             )
 
+        registry.register(
+            Tool(
+                name="explain_document_services",
+                description="List and explain all 19 DOC Tool Document AI services with capabilities and credit costs.",
+                parameters={"type": "object", "properties": {}, "required": []},
+                func=self.explain_services,
+            )
+        )
+        registry.register(
+            Tool(
+                name="run_document_ai_service",
+                description="Execute a specialized Document AI service on this document (invoice, contract, compliance, summary, financial_statement, receipt, resume, redaction, translation, form_parser).",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "service": {
+                            "type": "string",
+                            "description": "Service name to run: 'invoice', 'contract', 'compliance', 'summary', 'extraction', 'financial_statement', 'receipt', 'resume', 'redaction', 'translation', 'form_parser', 'classifier', 'anomaly_audit'.",
+                        },
+                        "instruction": {
+                            "type": "string",
+                            "description": "Specific instruction or query for the service.",
+                        },
+                    },
+                    "required": ["service"],
+                },
+                func=self.run_service_tool,
+            )
+        )
+
     # ------------------------------------------------------------------
     # Compatibility methods for FreeAgent
     # ------------------------------------------------------------------
@@ -507,6 +537,86 @@ class EnhancedDocumentKit:
         parts = [f"=== {doc.name} — Page {p.page_number} of {p.total_pages} ===" for p in pages]
         texts = [p.text.strip() for p in pages]
         return "\n\n".join(f"{h}\n\n{t}" for h, t in zip(parts, texts))
+
+    def explain_services(self) -> str:
+        """Return catalog of all 19 Document AI services with credit pricing and capabilities."""
+        from backend.billing import SERVICE_PRICING
+        lines = [
+            "### DOC Tool Document AI Service Catalog & Pricing\n",
+            "| Service | Cost | Description |",
+            "| :--- | :--- | :--- |",
+            "| **chat** | 1 credit | Interactive conversational document reasoning |",
+            "| **summary** | 10 credits | Multi-section executive summary with takeaways |",
+            "| **extraction** | 15 credits | Structured table, schema, and metrics extraction |",
+            "| **classifier** | 15 credits | Document taxonomy and category classification |",
+            "| **semantic_search** | 15 credits | Cross-lingual semantic search across English/Arabic |",
+            "| **factcheck** | 15 credits | Factual claim verification against document context |",
+            "| **receipt** | 20 credits | Receipt line items, merchant, tax, and expenses |",
+            "| **comparison** | 20 credits | Comparative analysis across clauses or documents |",
+            "| **invoice** | 25 credits | Vendor, line items, VAT, and payment terms extraction |",
+            "| **resume** | 25 credits | Candidate skills taxonomy, timeline, and seniority |",
+            "| **redaction** | 25 credits | PII masking (National IDs, IBANs, VAT, phones) |",
+            "| **form_parser** | 25 credits | Key-value pairs, checkboxes, and signatures |",
+            "| **compliance** | 30 credits | PII audit, GDPR/HIPAA risk scoring, privacy checks |",
+            "| **contract** | 35 credits | Legal clauses, liabilities, risk analysis |",
+            "| **financial_statement** | 35 credits | Balance sheet, P&L, income, solvency ratios |",
+            "| **translation** | 35 credits | High-fidelity bilingual Arabic-English translation |",
+            "| **arabic_ocr** | 35 credits | Specialized Arabic diacritics and dialect OCR |",
+            "| **anomaly_audit** | 35 credits | Numeric irregularity and fraud risk detection |",
+            "| **coordinator** | 45 credits | Multi-agent orchestrator for complex workflows |",
+        ]
+        return "\n".join(lines)
+
+    def run_service_tool(self, service: str, instruction: str = "") -> str:
+        """Execute a specialized Document AI service on this document."""
+        s = service.lower().replace("-", "_").strip()
+        doc_name = self.documents[0].name if self.documents else None
+
+        if s == "invoice" and hasattr(self, "extract_invoice_data") and doc_name:
+            return str(self.extract_invoice_data(doc_name))
+        if s == "contract" and hasattr(self, "extract_contract_data") and doc_name:
+            return str(self.extract_contract_data(doc_name))
+        if s == "receipt" and hasattr(self, "extract_receipt_data") and doc_name:
+            return str(self.extract_receipt_data(doc_name))
+        if s == "resume" and hasattr(self, "extract_resume_data") and doc_name:
+            return str(self.extract_resume_data(doc_name))
+        if s == "compliance" and hasattr(self, "audit_document_compliance") and doc_name:
+            return str(self.audit_document_compliance(doc_name))
+        if s == "form_parser" and hasattr(self, "extract_form_fields") and doc_name:
+            return str(self.extract_form_fields(doc_name))
+        if s == "redaction" and hasattr(self, "redact_sensitive_data") and doc_name:
+            return str(self.redact_sensitive_data(doc_name))
+        if s == "classifier" and hasattr(self, "classify_document") and doc_name:
+            return str(self.classify_document(doc_name))
+        if s in ("financial_statement", "finance") and hasattr(self, "analyze_financial_statement") and doc_name:
+            return str(self.analyze_financial_statement(doc_name))
+        if s == "translation" and hasattr(self, "translate_document") and doc_name:
+            return str(self.translate_document(doc_name, target_language="en"))
+        if s == "anomaly_audit" and hasattr(self, "audit_document_anomalies") and doc_name:
+            return str(self.audit_document_anomalies(doc_name))
+
+        # Fallback using LLM with document context
+        doc_text = ""
+        if self.documents and self.documents[0].pages:
+            doc_text = "\n\n".join([f"--- Page {p.page_number} ---\n{p.text}" for p in self.documents[0].pages[:3]])
+        elif self.vector_store:
+            docs = self.vector_store.search(instruction or s, top_k=5)
+            doc_text = "\n\n".join([d.page_content for d in docs])
+
+        prompt = (
+            f"You are the DOC Tool {s.upper()} specialist engine.\n"
+            f"Analyze the following document context:\n\n{doc_text}\n\n"
+            f"Execution Instruction: {instruction or 'Extract all structured fields, metrics, and insights.'}\n"
+            f"Return a structured, professional markdown report with clear headings, tables, or key-value fields."
+        )
+        if self.llm:
+            try:
+                from langchain_core.messages import HumanMessage
+                res = self.llm.invoke([HumanMessage(content=prompt)])
+                return res.content if hasattr(res, "content") else str(res)
+            except Exception as e:
+                return f"Error executing {s}: {e}"
+        return f"Executed {s} on {doc_name}."
 
     def summarize(self, text: str) -> str:
         """Summarize text using the configured LLM or extractive fallback."""

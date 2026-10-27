@@ -120,8 +120,8 @@ export default function ConversationsPage() {
     }
 
     const remainingCredits = account?.remainingCredits ?? 1200;
-    if (remainingCredits < 5) {
-      setModalError("Insufficient credits. Starting a chat requires at least 5 credits.");
+    if (remainingCredits < 1) {
+      setModalError("Insufficient credits. Starting a chat requires at least 1 credit.");
       return;
     }
 
@@ -299,7 +299,7 @@ export default function ConversationsPage() {
                 </span>
               </div>
               <span className="rounded-md bg-teal-200/70 px-2 py-0.5 font-mono text-[11px] font-bold text-teal-800">
-                5 Credits / Response
+                1 Credit / Response
               </span>
             </div>
 
@@ -414,7 +414,7 @@ export default function ConversationsPage() {
               </button>
               <button
                 type="button"
-                disabled={!selectedFile || isUploading || remaining < 5}
+                disabled={!selectedFile || isUploading || remaining < 1}
                 onClick={handleStartChat}
                 className="inline-flex items-center gap-2 rounded-xl bg-[#087f74] px-4 py-2 text-xs font-semibold text-white hover:bg-[#076c63] transition disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
               >

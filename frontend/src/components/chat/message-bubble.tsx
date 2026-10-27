@@ -1,9 +1,11 @@
 "use client";
+
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { type Message } from "@/lib/types";
 import { Sparkles, Copy, Check } from "lucide-react";
+
 export function MessageBubble({
   message,
   isStreaming = false,
@@ -13,44 +15,58 @@ export function MessageBubble({
 }) {
   const assistant = message.role === "assistant";
   const [copied, setCopied] = useState(false);
-  const [copyError, setCopyError] = useState(false);
+
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(message.content);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setCopyError(true);
-    }
+    } catch {}
   };
+
   return (
     <article
       className={`flex gap-3 py-4 ${assistant ? "" : "justify-end"}`}
       aria-label={assistant ? "Assistant response" : "Your message"}
     >
       {assistant && (
-        <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#e7f2ec] text-teal-700">
-          <Sparkles size={17} />
+        <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-teal-700 to-emerald-600 text-white shadow-2xs">
+          <Sparkles size={16} />
         </span>
       )}
       <div
         className={
           assistant
-            ? "min-w-0 flex-1"
-            : "max-w-[85%] rounded-2xl rounded-br-sm bg-[#eaf0ef] px-4 py-3"
+            ? "min-w-0 flex-1 space-y-1.5"
+            : "max-w-[85%] rounded-2xl rounded-br-xs bg-[#eaf4ef] border border-teal-100 px-4 py-3 shadow-2xs"
         }
       >
         {assistant && (
-          <p className="mb-3 text-xs font-semibold text-[#41645c]">DOCTool</p>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs font-bold text-slate-900">Luna AI</span>
+            <span className="rounded bg-teal-50 border border-teal-200 px-1.5 py-0.2 text-[10px] font-mono text-teal-800 font-semibold">
+              gpt-6-luna
+            </span>
+            {isStreaming && (
+              <span className="flex items-center gap-1 text-[11px] text-teal-700 animate-pulse font-medium">
+                <span className="h-1.5 w-1.5 rounded-full bg-teal-600" />
+                Thinking…
+              </span>
+            )}
+          </div>
         )}
         <div
-          className={`text-sm leading-7 ${assistant ? "markdown-content text-slate-600" : "whitespace-pre-wrap break-words text-slate-700"}`}
+          className={`text-sm leading-7 ${
+            assistant
+              ? "markdown-content text-slate-700"
+              : "whitespace-pre-wrap break-words text-slate-800 font-medium"
+          }`}
         >
           {assistant ? (
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content ||
                 (isStreaming
-                  ? "Reading your source…"
+                  ? "Analyzing document with Luna…"
                   : "No response was received.")}
             </ReactMarkdown>
           ) : (
@@ -58,18 +74,16 @@ export function MessageBubble({
           )}
         </div>
         {assistant && message.content && (
-          <button
-            onClick={copy}
-            className="mt-3 flex items-center gap-1.5 rounded px-1 py-1 text-[10px] text-slate-400 hover:text-teal-700"
-            aria-label="Copy response"
-          >
-            {copied ? <Check size={12} /> : <Copy size={12} />}{" "}
-            {copyError
-              ? "Select text to copy"
-              : copied
-                ? "Copied"
-                : "Copy response"}
-          </button>
+          <div className="flex items-center gap-2 pt-1">
+            <button
+              onClick={copy}
+              className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition shadow-2xs"
+              aria-label="Copy response"
+            >
+              {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+              <span>{copied ? "Copied" : "Copy"}</span>
+            </button>
+          </div>
         )}
       </div>
     </article>

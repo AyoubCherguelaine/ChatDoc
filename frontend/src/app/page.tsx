@@ -398,7 +398,7 @@ export default function Home() {
                   1,200 Free Trial API Credits for Every Company
                 </h3>
                 <p className="mt-2 text-sm text-teal-100/90 leading-relaxed max-w-xl">
-                  Test every Document AI capability with instant live API keys. Pay strictly by LLM compute usage — from 5 credits for conversational retrieval to 25 for verified invoices and 35 for contract risk analysis.
+                  Test every Document AI capability with instant live API keys. Pay strictly by LLM compute usage — from 1 credit for conversational retrieval to 25 for verified invoices and 35 for contract risk analysis.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-4 text-xs text-teal-200">
                   <span className="flex items-center gap-1.5">

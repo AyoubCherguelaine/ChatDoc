@@ -52,7 +52,7 @@ def test_credit_deduction_and_pricing(fresh_billing):
     account = fresh_billing.get_or_create_company(user_id)
 
     # Check pricing based on LLM usage
-    assert fresh_billing.get_service_cost("chat") == 5
+    assert fresh_billing.get_service_cost("chat") == 1
     assert fresh_billing.get_service_cost("summary") == 10
     assert fresh_billing.get_service_cost("extraction") == 15
     assert fresh_billing.get_service_cost("receipt") == 20
@@ -202,13 +202,13 @@ def test_web_chat_deducts_company_credits(client, monkeypatch):
     monkeypatch.setattr(server.rag, "get_history", lambda *a: [])
     monkeypatch.setattr(server.rag, "stream_chat", lambda **kw: iter(["Test response"]))
 
-    # Send chat message (conversational costs 5 credits)
+    # Send chat message (conversational costs 1 credit)
     res = client.post(
         "/api/sessions/sess1/chat",
         json={"message": "What is in this doc?", "mode": "conversational"},
     )
     assert res.status_code == 200
-    assert account.remaining_credits == 1200 - 5
+    assert account.remaining_credits == 1200 - 1
 
     # Exhaust remaining credits
     account.used_credits = 1200

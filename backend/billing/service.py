@@ -27,7 +27,7 @@ API_KEY_PREFIX = "docu_live_"
 SERVICE_PRICING: Dict[str, Dict[str, Any]] = {
     "chat": {
         "name": "Document Chat",
-        "credits": 5,
+        "credits": 1,
         "llm_tier": "Light",
         "description": "Fast conversational Q&A over document chunks",
         "category": "General",

@@ -44,7 +44,7 @@ const services: ServiceCardInfo[] = [
     category: "general",
     description: "Ask questions and get answers grounded in your documents.",
     badge: "Interactive",
-    credits: 5,
+    credits: 1,
     llmTier: "Light / Retrieval",
     icon: <FileText size={28} />,
     workflowId: "actions",
