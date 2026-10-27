@@ -225,3 +225,155 @@ class TestContractAgentWithOcr:
         result = agent.run("Analyze contract.pdf for risks")
         assert result.response is not None
         assert "California" in result.response
+
+
+class TestOcrBlockExtraction:
+    def test_extract_native_page_blocks(self, tmp_path):
+        """Test native PDF block extraction with titles, text, and tables."""
+        import fitz
+        from backend.agent.tools.ocr import extract_native_page_blocks
+
+        pdf_path = tmp_path / "invoice_sample.pdf"
+        doc = fitz.open()
+        page = doc.new_page()
+        page.insert_text((50, 40), "TAX INVOICE #INV-987", fontsize=18)
+        page.insert_text((50, 80), "Client: Paseetah Saudi Arabia", fontsize=11)
+        
+        # Add table lines
+        page.draw_rect(fitz.Rect(50, 110, 400, 200))
+        page.draw_line(fitz.Point(50, 140), fitz.Point(400, 140))
+        page.draw_line(fitz.Point(200, 110), fitz.Point(200, 200))
+        page.insert_text((60, 130), "Service Item")
+        page.insert_text((220, 130), "Amount")
+        page.insert_text((60, 170), "Cloud AI Compute")
+        page.insert_text((220, 170), "750.00")
+        doc.save(str(pdf_path))
+        doc.close()
+
+        blocks = extract_native_page_blocks(pdf_path, 1)
+        assert len(blocks) >= 2
+
+        # Check title block
+        title_blocks = [b for b in blocks if b["type"] == "title"]
+        assert len(title_blocks) >= 1
+        assert "TAX INVOICE" in title_blocks[0]["content"]
+        assert "title" in title_blocks[0]
+        assert "metadata" in title_blocks[0]
+        assert title_blocks[0]["metadata"]["page_number"] == 1
+        assert "bbox" in title_blocks[0]["metadata"]
+
+        # Check text block
+        text_blocks = [b for b in blocks if b["type"] == "text"]
+        assert any("Paseetah" in b["content"] for b in text_blocks)
+
+        # Check reading order
+        orders = [b["metadata"]["reading_order"] for b in blocks]
+        assert orders == sorted(orders)
+
+    def test_ocr_extract_blocks_vision_mock(self, tmp_path):
+        """Test vision OCR block extraction parsing with table:content_md and image:description."""
+        pdf_path = tmp_path / "scanned.pdf"
+        pdf_path.write_bytes(b"%PDF-1.4 test")
+
+        mock_renderer = MagicMock()
+        mock_renderer.render_page.return_value = b"fake-png-bytes"
+        mock_renderer.page_count.return_value = 1
+
+        mock_llm = MagicMock()
+        vision_json = json.dumps({
+            "page_number": 1,
+            "blocks": [
+                {
+                    "type": "title",
+                    "content": "Official Report Header",
+                    "title": "Official Report Header",
+                    "metadata": {"bbox": [50, 20, 300, 60], "reading_order": 1}
+                },
+                {
+                    "type": "table",
+                    "content": "| Item | Price |\n|---|---|\n| API Usage | $50 |",
+                    "metadata": {"bbox": [50, 100, 400, 200], "reading_order": 2},
+                    "table": {
+                        "content_md": "| Item | Price |\n|---|---|\n| API Usage | $50 |",
+                        "headers": ["Item", "Price"],
+                        "rows": [["API Usage", "$50"]]
+                    }
+                },
+                {
+                    "type": "image",
+                    "content": "[Image: Corporate blue logo emblem]",
+                    "metadata": {"bbox": [50, 220, 120, 280], "reading_order": 3},
+                    "image": {
+                        "description": "Corporate blue logo emblem with verified crest",
+                        "ocr_text": "Verified"
+                    }
+                }
+            ]
+        })
+        mock_llm.invoke.return_value = MagicMock(content=vision_json)
+
+        service = OcrService(llm=mock_llm, renderer=mock_renderer)
+        with patch.object(service, "_image_to_base64", return_value="b64data"):
+            result = service.ocr_extract_blocks(pdf_path, page_number=1, force_ocr=True)
+
+        assert result["total_pages"] == 1
+        blocks = result["blocks"]
+        assert len(blocks) == 3
+
+        # 1. Title block
+        assert blocks[0]["type"] == "title"
+        assert blocks[0]["title"] == "Official Report Header"
+
+        # 2. Table block with content_md
+        assert blocks[1]["type"] == "table"
+        assert "| Item | Price |" in blocks[1]["table"]["content_md"]
+
+        # 3. Image block with description ("lil describe")
+        assert blocks[2]["type"] == "image"
+        assert "Corporate blue logo emblem" in blocks[2]["image"]["description"]
+
+    def test_enhanced_kit_has_ocr_extract_blocks(self):
+        kit = EnhancedDocumentKit()
+        assert hasattr(kit, "ocr_extract_blocks")
+        assert hasattr(kit, "ocr_page_blocks")
+
+    def test_bilingual_language_detection(self):
+        from backend.agent.tools.ocr import detect_block_language
+
+        ar_text = "شركة الأفق للتجارة العامة - فاتورة ضريبية ورقم ضريبي"
+        en_text = "Global Horizon Enterprises LLC - Commercial Invoice and VAT statement"
+        mixed_text = "Tax Invoice / فاتورة ضريبية رقم INV-2026-99"
+
+        lang_ar, dir_ar = detect_block_language(ar_text)
+        assert lang_ar == "ar"
+        assert dir_ar == "rtl"
+
+        lang_en, dir_en = detect_block_language(en_text)
+        assert lang_en == "en"
+        assert dir_en == "ltr"
+
+        lang_mixed, dir_mixed = detect_block_language(mixed_text)
+        assert lang_mixed in ("mixed", "ar")
+        assert dir_mixed == "rtl"
+
+    def test_ocr_read_page_blocks_bilingual(self, tmp_path):
+        import fitz
+        from backend.agent.tools.ocr import OcrService
+
+        pdf_path = tmp_path / "bilingual_sample.pdf"
+        doc = fitz.open()
+        page = doc.new_page(width=595, height=842)
+
+        # Add Arabic and English text
+        page.insert_text((50, 100), "فاتورة مبيعات معتمدة", fontsize=16)
+        page.insert_text((50, 150), "Authorized Sales Invoice from Saudi Tech Co", fontsize=11)
+        doc.save(str(pdf_path))
+        doc.close()
+
+        ocr_svc = OcrService()
+        res = ocr_svc.ocr_read_page_blocks(pdf_path, page_number=1, language="auto")
+        assert res["page_number"] == 1
+        assert "language_detected" in res
+        assert "direction" in res
+        assert "block_count" in res
+        assert len(res["blocks"]) >= 1

@@ -319,14 +319,14 @@ def test_company_service_refunds_credits_on_unexpected_exception(client, monkeyp
 
     # Mock agent that raises an unexpected exception
     mock_agent = MagicMock()
-    mock_agent.run.side_effect = RuntimeError("Fatal GPU out of memory")
+    mock_agent.run.side_effect = RuntimeError("Synthetic worker failure for refund test")
     monkeypatch.setattr(server.rag, "_build_agent", lambda bundle, model, mode: mock_agent)
 
     headers = {"X-API-Key": account.api_key}
     res = client.post(
-        "/api/v1/services/comparison",
+        "/api/v1/services/invoice",
         headers=headers,
-        json={"document_id": "doc-uuid", "query": "compare liabilities"},
+        json={"document_id": "doc-uuid", "query": "extract invoice"},
     )
 
     # Must return 500 with refund confirmation

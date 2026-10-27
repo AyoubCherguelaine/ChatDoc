@@ -4,10 +4,11 @@ import io
 import json
 import logging
 import tempfile
+import time
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal, Optional
 
 from fastapi import (
     Depends,
@@ -556,6 +557,120 @@ def read_document_page(doc_id: str, page: int, user: CurrentUser):
     if content is None:
         raise HTTPException(404, "Page or section not found")
     return {"page": page, "totalPages": document.total_pages, "text": content.text, "filename": document.name}
+
+
+@app.get("/api/documents/{doc_id}/ocr/blocks")
+def get_document_ocr_blocks(
+    doc_id: str,
+    user: CurrentUser,
+    page: Optional[int] = None,
+    force_ocr: bool = False,
+):
+    """
+    Extract and return layout-aware blocks (text, title, metadata, tables with content_md, images with descriptions).
+    """
+    doc = query(
+        "SELECT id, original_filename, page_count FROM docuchat.documents WHERE id = %s AND user_id = %s",
+        (doc_id, str(user["id"])),
+        one=True,
+    )
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    file_path = rag._pdf_path(doc_id)
+    if not file_path.exists():
+        candidates = [
+            Path(f"backend/storage/uploads/{doc_id}.pdf"),
+            Path(f"backend/storage/uploads/{doc_id}"),
+            Path(f"/tmp/{doc_id}.pdf"),
+            Path(f"/tmp/{doc['original_filename']}"),
+        ]
+        for c in candidates:
+            if c.exists():
+                file_path = c
+                break
+
+    if not file_path.exists():
+        raise HTTPException(404, "Document file not found on storage.")
+
+    from backend.agent.tools.ocr import OcrService
+
+    ocr_service = OcrService()
+    try:
+        data = ocr_service.ocr_extract_blocks(file_path, page_number=page, force_ocr=force_ocr)
+        return {
+            "status": "success",
+            "document_id": doc_id,
+            "filename": doc["original_filename"],
+            "total_pages": data.get("total_pages", doc["page_count"] or 1),
+            "page": page,
+            "blocks": data.get("blocks", []),
+            "pages": data.get("pages", []),
+        }
+    except Exception as exc:
+        logger.error("Failed to extract blocks for %s: %s", doc_id, exc)
+        raise HTTPException(500, f"Block extraction failed: {exc}")
+
+
+@app.get("/api/documents/{doc_id}/page/{page_num}/ocr/blocks")
+def get_document_page_ocr_blocks(
+    doc_id: str,
+    page_num: int,
+    user: CurrentUser,
+    language: str = "auto",
+    force_ocr: bool = False,
+):
+    """
+    Extract bilingual Arabic and English layout blocks for a specific document page number.
+    Returns blocks with reading direction, language classification, markdown tables, and visual descriptions.
+    """
+    doc = query(
+        "SELECT id, original_filename, page_count FROM docuchat.documents WHERE id = %s AND user_id = %s",
+        (doc_id, str(user["id"])),
+        one=True,
+    )
+    if not doc:
+        raise HTTPException(404, "Document not found")
+
+    file_path = rag._pdf_path(doc_id)
+    if not file_path.exists():
+        candidates = [
+            Path(f"backend/storage/uploads/{doc_id}.pdf"),
+            Path(f"backend/storage/uploads/{doc_id}"),
+            Path(f"/tmp/{doc_id}.pdf"),
+            Path(f"/tmp/{doc['original_filename']}"),
+        ]
+        for c in candidates:
+            if c.exists():
+                file_path = c
+                break
+
+    if not file_path.exists():
+        raise HTTPException(404, "Document file not found on storage.")
+
+    from backend.agent.tools.ocr import OcrService
+
+    ocr_service = OcrService()
+    try:
+        data = ocr_service.ocr_read_page_blocks(
+            file_path,
+            page_number=page_num,
+            language=language,
+            force_ocr=force_ocr,
+        )
+        return {
+            "status": "success",
+            "document_id": doc_id,
+            "filename": doc["original_filename"],
+            "page_number": page_num,
+            "language_detected": data.get("language_detected", language),
+            "direction": data.get("direction", "rtl" if language == "ar" else "ltr"),
+            "block_count": data.get("block_count", len(data.get("blocks", []))),
+            "blocks": data.get("blocks", []),
+        }
+    except Exception as exc:
+        logger.error("Failed to extract page blocks for %s (page %d): %s", doc_id, page_num, exc)
+        raise HTTPException(500, f"Page block extraction failed: {exc}")
 
 
 # ---------------------------------------------------------------------------
@@ -1887,3 +2002,231 @@ def execute_company_service(
         "iterations": result.iterations,
         "steps": result.steps,
     }
+
+
+class PlaygroundRunPayload(BaseModel):
+    service: str = Field(..., description="Target service: invoice, contract, receipt, etc.")
+    document_id: Optional[str] = Field(None, description="Existing document ID from drive/workspace")
+    text_content: Optional[str] = Field(None, description="Raw text or sample document text for testing")
+    system_prompt: Optional[str] = Field(None, description="Custom system prompt override")
+    user_prompt: Optional[str] = Field(None, description="Custom task / user query prompt")
+    schema_override: Optional[Any] = Field(None, description="Target JSON schema or template structure")
+    model: Optional[str] = Field(None, description="Model override (e.g. gpt-4o, gpt-4o-mini)")
+    temperature: Optional[float] = Field(None, ge=0.0, le=2.0, description="Sampling temperature")
+    output_format: Literal["json", "markdown", "auto"] = Field("auto", description="Desired output format")
+
+
+PlaygroundRunPayload.model_rebuild()
+
+
+@app.get("/api/playground/presets")
+def get_playground_presets(user: CurrentUser):
+    """Retrieve service presets, default prompts, schemas, and sample contexts for the playground."""
+    from backend.agent.playground_presets import SERVICE_PRESETS
+    model_list = list(dict.fromkeys(
+        ([settings.DEFAULT_MODEL] if settings.DEFAULT_MODEL else []) +
+        (settings.CHAT_MODELS if settings.CHAT_MODELS else [])
+    ))
+    if not model_list:
+        model_list = [settings.DEFAULT_MODEL]
+    models = [{"id": m, "name": m, "description": f"Model configured in .env ({m})"} for m in model_list]
+    return {
+        "presets": SERVICE_PRESETS,
+        "models": models,
+        "defaultModel": settings.DEFAULT_MODEL,
+    }
+
+
+@app.post("/api/playground/run")
+def run_playground(
+    payload: PlaygroundRunPayload,
+    user: CurrentUser,
+):
+    """
+    Execute an interactive playground run for any Document AI service.
+    Supports comparing models/prompts, custom schemas, raw text / sample docs, or drive documents.
+    """
+    from backend.agent.playground_presets import SERVICE_PRESETS
+
+    service_name = payload.service.lower().replace("-", "_")
+    if service_name not in SERVICE_PRICING:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Unknown service '{payload.service}'. Supported: {', '.join(SERVICE_PRICING.keys())}",
+        )
+
+    account = billing_service.get_or_create_company(user["id"], user.get("name"))
+    cost = billing_service.get_service_cost(service_name)
+    if account.remaining_credits < cost:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail=f"Insufficient company credits. Required: {cost}, Remaining: {account.remaining_credits}.",
+        )
+
+    # Resolve document context
+    filename = "playground_sample.txt"
+    doc_id = payload.document_id
+    bundle = None
+
+    if doc_id:
+        doc = query(
+            "SELECT id, original_filename FROM docuchat.documents WHERE id = %s AND user_id = %s",
+            (doc_id, str(user["id"])),
+            one=True,
+        )
+        if not doc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+        filename = doc["original_filename"]
+        bundle = rag.get_bundle(doc_id)
+    elif payload.text_content and payload.text_content.strip():
+        bundle = rag.create_text_bundle(payload.text_content.strip(), name=f"{service_name}_sample.txt")
+        filename = f"{service_name}_sample.txt"
+        doc_id = bundle.doc_id
+    else:
+        preset = SERVICE_PRESETS.get(service_name)
+        if preset and preset.get("sample_text"):
+            sample = preset["sample_text"]
+            bundle = rag.create_text_bundle(sample, name=f"{service_name}_preset_sample.txt")
+            filename = f"{service_name}_preset_sample.txt"
+            doc_id = bundle.doc_id
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either document_id or text_content must be provided.",
+            )
+
+    if bundle.vector_store is None:
+        raise HTTPException(status_code=500, detail="Document vector store failed to initialize.")
+
+    remaining = billing_service.check_and_deduct_credits(
+        account, service_name, document_id=doc_id, request_summary=f"Playground run: {service_name}"
+    )
+
+    preset = SERVICE_PRESETS.get(service_name, {})
+    effective_system_prompt = payload.system_prompt or preset.get("default_system_prompt")
+
+    schema_instruction = ""
+    if payload.schema_override:
+        schema_dump = (
+            json.dumps(payload.schema_override, indent=2, ensure_ascii=False)
+            if isinstance(payload.schema_override, (dict, list))
+            else str(payload.schema_override)
+        )
+        schema_instruction = (
+            f"\n\nOUTPUT SCHEMA REQUIREMENT:\n"
+            f"You MUST format and return your final response strictly as a JSON object adhering to this schema/structure:\n"
+            f"```json\n{schema_dump}\n```\n"
+            f"Return ONLY valid JSON matching this schema."
+        )
+
+    if effective_system_prompt and schema_instruction:
+        effective_system_prompt = effective_system_prompt + schema_instruction
+
+    task_prompt = (
+        payload.user_prompt
+        or preset.get("default_query")
+        or f"Perform complete {service_name} intelligence analysis on '{filename}'."
+    )
+    if not effective_system_prompt and schema_instruction:
+        task_prompt = task_prompt + schema_instruction
+
+    model = payload.model or settings.DEFAULT_MODEL
+    temp = payload.temperature
+
+    agent = rag._build_agent(
+        bundle=bundle,
+        model_name=model,
+        mode=service_name,
+        system_prompt=effective_system_prompt,
+        temperature=temp,
+    )
+
+    t0 = time.time()
+    try:
+        result = agent.run(task_prompt)
+        latency_ms = int((time.time() - t0) * 1000)
+
+        if not result.success:
+            remaining = billing_service.refund_credits(
+                account=account,
+                service_name=service_name,
+                credits_to_refund=cost,
+                document_id=doc_id,
+                reason=result.error or f"Playground {service_name} execution failed",
+            )
+            return {
+                "success": False,
+                "service": service_name,
+                "model": model,
+                "documentId": doc_id,
+                "filename": filename,
+                "latencyMs": latency_ms,
+                "creditsDeducted": 0,
+                "creditsRefunded": cost,
+                "creditsRemaining": remaining,
+                "error": result.error,
+                "result": result.response or "",
+                "data": None,
+                "iterations": result.iterations,
+                "steps": result.steps,
+            }
+
+        raw_text = getattr(result, "response", "") or ""
+        parsed_json = _extract_json_from_text(raw_text)
+
+        if parsed_json is None and hasattr(result, "steps") and result.steps:
+            for step in reversed(result.steps):
+                obs = step.get("observation", "")
+                if isinstance(obs, str) and ("{" in obs or "[" in obs):
+                    step_json = _extract_json_from_text(obs)
+                    if step_json:
+                        parsed_json = step_json
+                        break
+
+        is_structured_svc = service_name in [
+            "invoice", "receipt", "contract", "compliance", "form_parser",
+            "resume", "redaction", "classifier", "financial_statement", "translation", "anomaly_audit"
+        ]
+        if (payload.output_format == "json" or payload.schema_override or is_structured_svc) and parsed_json is None:
+            parsed_json = extract_structured_data(raw_text, service=service_name)
+
+        formatted_result = (
+            json.dumps(parsed_json, indent=2, ensure_ascii=False)
+            if isinstance(parsed_json, (dict, list))
+            else raw_text
+        )
+
+        return {
+            "success": True,
+            "service": service_name,
+            "model": model,
+            "temperature": temp,
+            "documentId": doc_id,
+            "filename": filename,
+            "latencyMs": latency_ms,
+            "creditsDeducted": cost,
+            "creditsRemaining": remaining,
+            "result": formatted_result,
+            "data": parsed_json,
+            "raw": raw_text,
+            "iterations": result.iterations,
+            "steps": result.steps,
+            "schemaUsed": payload.schema_override,
+            "promptUsed": task_prompt,
+        }
+
+    except Exception as exc:
+        latency_ms = int((time.time() - t0) * 1000)
+        logging.exception("Playground run failed for %s: %s", service_name, exc)
+        remaining = billing_service.refund_credits(
+            account=account,
+            service_name=service_name,
+            credits_to_refund=cost,
+            document_id=doc_id,
+            reason=f"Playground exception: {exc}",
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Playground execution failed: {exc}. Credits refunded (Remaining: {remaining}).",
+        )
+

@@ -422,3 +422,66 @@ export function fetchCompanyPricing() {
 export function fetchCompanyUsage() {
   return api<CompanyUsageResponse>("/company/usage");
 }
+
+export interface PlaygroundPreset {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  recommended_model: string;
+  default_temperature: number;
+  default_system_prompt: string;
+  default_query: string;
+  default_schema: any;
+  sample_text: string;
+}
+
+export interface PlaygroundPresetsResponse {
+  presets: Record<string, PlaygroundPreset>;
+  models: Array<{ id: string; name: string; description: string }>;
+  defaultModel: string;
+}
+
+export interface PlaygroundRunPayload {
+  service: string;
+  document_id?: string;
+  text_content?: string;
+  system_prompt?: string;
+  user_prompt?: string;
+  schema_override?: any;
+  model?: string;
+  temperature?: number;
+  output_format?: "json" | "markdown" | "auto";
+}
+
+export interface PlaygroundRunResult {
+  success: boolean;
+  service: string;
+  model: string;
+  temperature?: number;
+  documentId?: string;
+  filename?: string;
+  latencyMs: number;
+  creditsDeducted: number;
+  creditsRemaining: number;
+  result: string;
+  data?: any;
+  raw?: string;
+  iterations: number;
+  steps: Array<{ thought?: string; action?: string; observation?: string }>;
+  error?: string;
+  schemaUsed?: any;
+  promptUsed?: string;
+}
+
+export function fetchPlaygroundPresets() {
+  return api<PlaygroundPresetsResponse>("/playground/presets");
+}
+
+export function runPlayground(payload: PlaygroundRunPayload) {
+  return api<PlaygroundRunResult>("/playground/run", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+

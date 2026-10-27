@@ -12,8 +12,8 @@ import {
   ArrowUpRight,
   PanelLeftClose,
   Menu,
-  Search,
   ChevronDown,
+  Settings,
 } from "lucide-react";
 import { useState } from "react";
 import { Brand } from "@/components/brand";
@@ -28,7 +28,6 @@ export function Navbar() {
     { href: "/drive", label: "Overview", icon: LayoutDashboard },
     { href: "/drive?view=documents", label: "All documents", icon: Files },
     { href: "/conversations", label: "Conversations", icon: MessageSquare },
-    { href: "/agents", label: "AI studio", icon: Sparkles },
     { href: "/services", label: "AI Services", icon: Bot },
     { href: "/usage", label: "API & Credits", icon: Key },
   ];
@@ -126,12 +125,6 @@ export function Navbar() {
               Explore AI studio <ArrowUpRight size={14} />
             </Link>
           </div>
-          <Link
-            href="/drive?view=documents"
-            className="mb-5 flex items-center gap-2 px-3 text-xs text-slate-500"
-          >
-            <Search size={15} /> Find a document
-          </Link>
           <div className="flex items-center gap-3 border-t border-slate-200 px-2 pt-5">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#e4ecec] text-xs font-semibold text-slate-500">
               {user?.name?.[0]?.toUpperCase() || "U"}
@@ -145,9 +138,16 @@ export function Navbar() {
               </p>
             </div>
             <button
+              title="Settings (coming soon)"
+              className="rounded p-1 text-slate-400 hover:text-slate-600 transition"
+            >
+              <Settings size={16} />
+            </button>
+            <button
               onClick={logout}
               aria-label="Sign out"
-              className="rounded p-1 text-slate-400 hover:text-rose-600"
+              title="Log out"
+              className="rounded p-1 text-slate-400 hover:text-rose-600 transition"
             >
               <LogOut size={16} />
             </button>

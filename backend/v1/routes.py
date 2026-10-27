@@ -104,12 +104,15 @@ class RawUploadPayload(BaseModel):
 
 
 class PipelineRunPayload(BaseModel):
-    document_id: str = Field(..., description="Target document ID")
+    document_id: Optional[str] = Field(None, description="Target document ID from POST /api/v1/documents/upload")
+    text_content: Optional[str] = Field(None, description="Direct text to process if not passing document_id")
     service: str = Field(
         "summary",
         description="Service: invoice, contract, compliance, summary, form_parser, receipt, resume, research, chat",
     )
     query: Optional[str] = Field(None, description="Optional custom prompt or question")
+    system_prompt: Optional[str] = Field(None, description="Optional system prompt override")
+    schema_override: Optional[Any] = Field(None, description="Optional target JSON schema / structure")
     output_format: Literal["json", "markdown", "auto"] = Field(
         "auto", description="Desired format: structured json, markdown, or auto"
     )
@@ -129,6 +132,20 @@ class BatchTaskPayload(BaseModel):
 class PipelineBatchPayload(BaseModel):
     tasks: List[BatchTaskPayload]
     webhook_url: Optional[str] = None
+
+
+class OcrBlocksPayload(BaseModel):
+    document_id: str = Field(..., description="Target document ID")
+    page: Optional[int] = Field(None, description="Optional 1-indexed page number")
+    language: str = Field("auto", description="Language mode: 'auto', 'ar' (Arabic), 'en' (English), or 'mixed'")
+    force_ocr: bool = Field(False, description="Force vision-based OCR re-extraction")
+
+
+class OcrPageBlocksPayload(BaseModel):
+    document_id: str = Field(..., description="Target document ID")
+    page_number: int = Field(1, description="1-indexed page number")
+    language: str = Field("auto", description="Language mode: 'auto', 'ar', 'en', or 'mixed'")
+    force_ocr: bool = Field(False, description="Force vision-based OCR re-extraction")
 
 
 # ---------------------------------------------------------------------------
@@ -477,6 +494,178 @@ def pipeline_search_document(
     }
 
 
+def _resolve_document_file_path(doc_id: str) -> tuple[Path, str]:
+    """Helper to locate document on disk or storage."""
+    filename = f"doc_{doc_id}.pdf"
+    file_path = None
+    try:
+        row = query(
+            "SELECT original_filename, file_path FROM docuchat.documents WHERE id = %s",
+            (doc_id,),
+            one=True,
+        )
+        if row:
+            filename = row["original_filename"]
+            if row.get("file_path") and Path(row["file_path"]).exists():
+                file_path = Path(row["file_path"])
+    except Exception:
+        pass
+
+    if not file_path:
+        for p in [
+            rag._pdf_path(doc_id),
+            Path(f"backend/storage/uploads/{doc_id}.pdf"),
+            Path(f"backend/storage/uploads/{doc_id}"),
+            Path(f"/tmp/{doc_id}.pdf"),
+            Path(f"/tmp/{filename}"),
+        ]:
+            if p and p.exists():
+                file_path = p
+                break
+
+    if not file_path:
+        bundle = rag._registry.get(doc_id)
+        if bundle and getattr(bundle, "pdf_docs", None) and bundle.pdf_docs:
+            pdf_doc = bundle.pdf_docs[0]
+            if getattr(pdf_doc, "file_path", None) and Path(pdf_doc.file_path).exists():
+                file_path = Path(pdf_doc.file_path)
+
+    if not file_path or not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Document file for ID '{doc_id}' not found on storage.",
+        )
+    return file_path, filename
+
+
+@router.get("/ocr/document/{doc_id}", summary="Extract Layout-Aware Document Blocks")
+def pipeline_get_document_ocr_blocks(
+    doc_id: str,
+    page: Optional[int] = Query(None, description="Optional 1-indexed page number"),
+    language: str = Query("auto", description="Target language: 'auto', 'ar' (Arabic), 'en' (English), or 'mixed'"),
+    force_ocr: bool = Query(False, description="Force vision-based OCR re-extraction"),
+    account: CompanyAccount = CompanyAuth,
+):
+    """
+    Retrieve structured layout blocks from a document (titles, text, metadata,
+    tables with content_md, and images with descriptions) with Arabic and English support.
+    """
+    from backend.agent.tools.ocr import OcrService
+
+    file_path, filename = _resolve_document_file_path(doc_id)
+    ocr_service = OcrService()
+    try:
+        data = ocr_service.ocr_extract_blocks(file_path, page_number=page, language=language, force_ocr=force_ocr)
+        return {
+            "status": "success",
+            "document_id": doc_id,
+            "filename": filename,
+            "total_pages": data.get("total_pages", 1),
+            "page": page,
+            "language_detected": data.get("language_detected", language),
+            "direction": data.get("direction", "rtl" if language == "ar" else "ltr"),
+            "blocks": data.get("blocks", []),
+            "pages": data.get("pages", []),
+        }
+    except Exception as exc:
+        logger.error("OCR block extraction failed for %s: %s", doc_id, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"OCR block extraction failed: {exc}",
+        )
+
+
+@router.post("/ocr/blocks", summary="Extract Layout Blocks from Document")
+def pipeline_post_ocr_blocks(
+    payload: OcrBlocksPayload,
+    account: CompanyAccount = CompanyAuth,
+):
+    """Extract structural layout blocks with titles, text, tables (content_md), and images."""
+    return pipeline_get_document_ocr_blocks(
+        doc_id=payload.document_id,
+        page=payload.page,
+        language=payload.language,
+        force_ocr=payload.force_ocr,
+        account=account,
+    )
+
+
+@router.post("/ocr/page/blocks", summary="Extract Bilingual Arabic & English Layout Blocks by Page")
+def pipeline_post_page_ocr_blocks(
+    payload: OcrPageBlocksPayload,
+    account: CompanyAccount = CompanyAuth,
+):
+    """
+    Extract bilingual Arabic and English layout blocks for a specific page.
+    Returns blocks with reading direction, language classification, markdown tables, and visual descriptions.
+    """
+    from backend.agent.tools.ocr import OcrService
+
+    file_path, filename = _resolve_document_file_path(payload.document_id)
+    ocr_service = OcrService()
+    try:
+        data = ocr_service.ocr_read_page_blocks(
+            file_path,
+            page_number=payload.page_number,
+            language=payload.language,
+            force_ocr=payload.force_ocr,
+        )
+        return {
+            "status": "success",
+            "document_id": payload.document_id,
+            "filename": filename,
+            "page_number": payload.page_number,
+            "language_detected": data.get("language_detected", payload.language),
+            "direction": data.get("direction", "rtl" if payload.language == "ar" else "ltr"),
+            "block_count": data.get("block_count", len(data.get("blocks", []))),
+            "blocks": data.get("blocks", []),
+        }
+    except Exception as exc:
+        logger.error("Page OCR block extraction failed for %s (page %d): %s", payload.document_id, payload.page_number, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Page OCR extraction failed: {exc}",
+        )
+
+
+@router.get("/ocr/document/{doc_id}/page/{page_number}/blocks", summary="Extract Layout Blocks for Specific Page")
+def pipeline_get_page_ocr_blocks(
+    doc_id: str,
+    page_number: int,
+    language: str = Query("auto", description="Target language: 'auto', 'ar', 'en', 'mixed'"),
+    force_ocr: bool = Query(False, description="Force vision-based OCR re-extraction"),
+    account: CompanyAccount = CompanyAuth,
+):
+    """Retrieve bilingual layout blocks for a specific page number."""
+    from backend.agent.tools.ocr import OcrService
+
+    file_path, filename = _resolve_document_file_path(doc_id)
+    ocr_service = OcrService()
+    try:
+        data = ocr_service.ocr_read_page_blocks(
+            file_path,
+            page_number=page_number,
+            language=language,
+            force_ocr=force_ocr,
+        )
+        return {
+            "status": "success",
+            "document_id": doc_id,
+            "filename": filename,
+            "page_number": page_number,
+            "language_detected": data.get("language_detected", language),
+            "direction": data.get("direction", "rtl" if language == "ar" else "ltr"),
+            "block_count": data.get("block_count", len(data.get("blocks", []))),
+            "blocks": data.get("blocks", []),
+        }
+    except Exception as exc:
+        logger.error("Page OCR block extraction failed for %s (page %d): %s", doc_id, page_number, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Page OCR extraction failed: {exc}",
+        )
+
+
 @router.post("/pipeline/run", summary="Execute Pipeline Document AI Service")
 async def pipeline_run_service(
     payload: PipelineRunPayload,
@@ -502,13 +691,23 @@ async def pipeline_run_service(
             detail=f"Insufficient credits. Required: {cost}, Remaining: {account.remaining_credits}.",
         )
 
-    # Load bundle
-    try:
-        bundle = rag.get_bundle(payload.document_id)
-    except Exception as exc:
+    # Load bundle from document_id or text_content
+    target_doc_id = payload.document_id
+    if target_doc_id:
+        try:
+            bundle = rag.get_bundle(target_doc_id)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Document '{target_doc_id}' not found: {exc}",
+            )
+    elif payload.text_content and payload.text_content.strip():
+        bundle = rag.create_text_bundle(payload.text_content.strip(), name=f"{service_name}_text.txt")
+        target_doc_id = bundle.doc_id
+    else:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document '{payload.document_id}' not found: {exc}",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either 'document_id' or 'text_content' must be provided.",
         )
 
     if bundle.vector_store is None:
@@ -519,15 +718,35 @@ async def pipeline_run_service(
         remaining = billing_service.check_and_deduct_credits(
             account=account,
             service_name=service_name,
-            document_id=payload.document_id,
+            document_id=target_doc_id,
             request_summary=payload.query or f"Pipeline run: {service_name}",
         )
     except InsufficientCreditsError as exc:
         raise HTTPException(status_code=status.HTTP_402_PAYMENT_REQUIRED, detail=str(exc))
 
     model = payload.model or settings.DEFAULT_MODEL
-    agent = rag._build_agent(bundle, model, mode=service_name)
     task_prompt = payload.query or f"Perform complete {service_name} processing and structured analysis."
+
+    effective_system_prompt = payload.system_prompt
+    if payload.schema_override:
+        schema_dump = (
+            json.dumps(payload.schema_override, indent=2, ensure_ascii=False)
+            if isinstance(payload.schema_override, (dict, list))
+            else str(payload.schema_override)
+        )
+        schema_inst = (
+            f"\n\nOUTPUT SCHEMA REQUIREMENT:\n"
+            f"You MUST format and return your final response strictly as a JSON object adhering to this schema/structure:\n"
+            f"```json\n{schema_dump}\n```\n"
+            f"Return ONLY valid JSON matching this schema."
+        )
+        if effective_system_prompt:
+            effective_system_prompt += schema_inst
+        else:
+            task_prompt += schema_inst
+
+    agent = rag._build_agent(bundle, model, mode=service_name, system_prompt=effective_system_prompt)
+
 
     try:
         result = await run_in_threadpool(agent.run, task_prompt)

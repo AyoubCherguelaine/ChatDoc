@@ -25,11 +25,13 @@ import {
   Tags,
   TrendingUp,
   AlertTriangle,
+  FlaskConical,
+  Code2,
 } from "lucide-react";
 import { fetchDocuments, fetchCompanyAccount, type CompanyAccount } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { ServiceLauncherModal, type ServiceCardInfo } from "@/components/services/service-modal";
+import type { ServiceCardInfo } from "@/components/services/service-modal";
 import type { Document } from "@/lib/types";
 import Link from "next/link";
 
@@ -263,7 +265,6 @@ export default function ServicesPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeServiceModal, setActiveServiceModal] = useState<ServiceCardInfo | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -322,10 +323,10 @@ export default function ServicesPage() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-[28px] font-semibold tracking-tight text-slate-900">
-              Enterprise Document AI Suite
+              Enterprise Document AI Solutions
             </h1>
             <p className="mt-1 text-sm text-[#87959c]">
-              Specialized Document AI agents for invoices, receipts, legal contracts, talent screening, compliance, and forms.
+              B2B Document AI capabilities ready for production via our unified REST API. Test interactively in the sandbox demo or integrate directly using your company API key.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -449,31 +450,29 @@ export default function ServicesPage() {
                 </p>
               </div>
 
-              <Button
-                onClick={() => setActiveServiceModal(svc)}
-                className="mt-5 w-full justify-between group-hover:bg-teal-700 transition"
-              >
-                <span className="flex items-center gap-2">
-                  <Sparkles size={15} /> Launch {svc.title}
-                </span>
-                <ArrowRight size={14} />
-              </Button>
+              <div className="mt-5 flex items-center gap-2">
+                <Link
+                  href={`/playground?service=${svc.id}`}
+                  className="flex-1 flex items-center justify-between rounded-lg bg-teal-50 px-3.5 py-2.5 text-xs font-semibold text-teal-800 border border-teal-200/80 hover:bg-teal-700 hover:text-white transition group-hover:border-teal-700"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles size={14} /> Sandbox Demo
+                  </span>
+                  <ArrowRight size={13} />
+                </Link>
+                <Link
+                  href={`/playground?service=${svc.id}&code=true`}
+                  title="View REST API code snippet"
+                  className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-2xs transition"
+                >
+                  <Code2 size={14} className="text-[#087f74]" />
+                  <span>API</span>
+                </Link>
+              </div>
             </div>
           ))}
         </div>
       )}
-
-      {/* Service Source Picker & Direct Runner Modal */}
-      <ServiceLauncherModal
-        service={activeServiceModal}
-        open={Boolean(activeServiceModal)}
-        onClose={() => setActiveServiceModal(null)}
-        docs={docs}
-        onDocumentAdded={(newDoc) => {
-          setDocs((prev) => [newDoc, ...prev.filter((d) => d.id !== newDoc.id)]);
-        }}
-        remainingCredits={account?.remainingCredits}
-      />
     </div>
   );
 }

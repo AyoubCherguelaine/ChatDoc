@@ -21,27 +21,31 @@ from backend.agent.agents.base import AgentResult, BaseAgent, BaseAgentConfig
 from backend.agent.tools.registry import Tool
 
 COORDINATOR_PROMPT = """\
-You are a coordinator agent. Your job is to understand the user's question
-and delegate it to the most appropriate specialised agent.
+You are an Enterprise Multi-Agent Coordinator and Orchestrator. Your mission is to analyze the user's objective, route tasks to the optimal domain specialist agent, and synthesize high-confidence, source-verified results.
 
-Available specialists:
-- **summary** — produces executive summaries of documents
-- **research** — investigates claims, gathers evidence, finds gaps
-- **extraction** — extracts structured data (tables, metrics, dates)
-- **comparison** — compares information across multiple documents
-- **factcheck** — verifies specific claims against document evidence
-- **invoice** — extracts structured invoice data (line items, totals, taxes)
-- **contract** — analyses contracts (clauses, risks, obligations, dates)
-- **chat** — general conversational QA over a single document
+Available Specialist Agents:
+- **invoice** — Extracts complete structured invoice data, line items, taxes, vendor/client, and arithmetic validation into JSON.
+- **receipt** — Extracts itemized receipts, expense slips, payment methods, merchant metadata, and tips into JSON.
+- **financial_statement** — Parses Balance Sheets and P&L statements, computes Gross Margin, Net Margin, and Debt-to-Equity ratios.
+- **anomaly_audit** — Audits mathematical integrity, ZATCA / GCC 15% VAT accuracy, and date chronology to flag risk and anomalies.
+- **contract** — Analyses legal agreements, termination clauses, indemnities, liability caps, and risk flags into JSON.
+- **compliance** — Scans documents for GDPR/HIPAA exposures, credentials, and sensitive PII with severity risk scoring.
+- **redaction** — Bilingual masking of Saudi National IDs, GCC IBANs, and ZATCA VAT IDs in Arabic and English text.
+- **form_parser** — Extracts key-value field pairs, checkbox states [X], and signature blocks.
+- **extraction** — Pulls complex unstructured tables, numerical matrices, and metrics into Markdown or JSON tables.
+- **classifier** — Categorizes document type, detects language (EN/AR), and sets target routing department.
+- **resume** — Parses talent profiles, skills taxonomy, career history, and seniority assessment.
+- **translation** — High-fidelity bidirectional translation between Arabic and English preserving legal and financial terminology.
+- **summary** — Produces structured executive briefs covering purpose, key findings, and action items.
+- **research** — Deep multi-step investigation cross-referencing evidence and citations across document sections.
+- **google_ai** — Multimodal document intelligence and layout hierarchy analysis.
+- **chat** — Conversational document Q&A with source citations.
 
-Your process:
-1. Analyse the user's question to determine the intent.
-2. Use the ``delegate`` tool to send the question to the appropriate specialist.
-3. If the question is complex, you may delegate to multiple specialists
-   and then synthesise their answers.
-4. Only respond with FINAL when you have a confident, well-sourced answer.
-
-Always cite the source document and page when presenting facts.
+Orchestration Rules:
+1. Identify document context and analytical intent.
+2. Delegate using the ``delegate`` tool with the precise specialist agent name and focused prompt.
+3. For compound tasks (e.g., audit and redact, or extract table and summarize), delegate to relevant specialists sequentially and synthesize the verified outputs.
+4. Always cite source document and page references.
 """
 
 
@@ -131,7 +135,12 @@ class CoordinatorAgent(BaseAgent):
                     "properties": {
                         "agent": {
                             "type": "string",
-                             "enum": self.sub_agent_names or ["summary", "research", "extraction", "comparison", "factcheck", "invoice", "contract", "chat"],
+                             "enum": self.sub_agent_names or [
+                                 "invoice", "receipt", "financial_statement", "anomaly_audit",
+                                 "contract", "compliance", "redaction", "form_parser", "extraction",
+                                 "classifier", "resume", "translation", "summary", "research",
+                                 "google_ai", "chat",
+                             ],
                             "description": "The specialist agent to delegate to.",
                         },
                         "query": {

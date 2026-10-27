@@ -236,6 +236,7 @@ class BaseAgent:
     def run(self, query: str) -> AgentResult:
         """Execute the ReAct loop synchronously with error resilience."""
         steps: list[dict] = []
+        consecutive_errors = 0
 
         try:
             for iteration in range(1, self.config.max_iterations + 1):
@@ -295,8 +296,9 @@ class BaseAgent:
                 steps[-1]["observation"] = observation
 
                 if not observation or observation.startswith("ERROR:"):
-                    if self.config.stop_after_no_action:
-                        self._log(f"  Agent stopped: no valid tool result for '{parsed['action']}'")
+                    consecutive_errors += 1
+                    if consecutive_errors >= 3 and self.config.stop_after_no_action:
+                        self._log(f"  Agent stopped: repeated failed tool results for '{parsed['action']}'")
                         return AgentResult(
                             response=self._fallback_response(query, steps, observation),
                             steps=steps,
@@ -304,6 +306,8 @@ class BaseAgent:
                             iterations=iteration,
                             error=observation,
                         )
+                else:
+                    consecutive_errors = 0
 
             # Max iterations reached
             self._log("  Agent reached max iterations without a final answer.")
@@ -331,6 +335,7 @@ class BaseAgent:
     async def arun(self, query: str) -> AgentResult:
         """Execute the ReAct loop asynchronously with error resilience."""
         steps: list[dict] = []
+        consecutive_errors = 0
 
         try:
             for iteration in range(1, self.config.max_iterations + 1):
@@ -388,8 +393,9 @@ class BaseAgent:
                 steps[-1]["observation"] = observation
 
                 if not observation or observation.startswith("ERROR:"):
-                    if self.config.stop_after_no_action:
-                        self._log(f"  Agent stopped: no valid tool result for '{parsed['action']}'")
+                    consecutive_errors += 1
+                    if consecutive_errors >= 3 and self.config.stop_after_no_action:
+                        self._log(f"  Agent stopped: repeated failed tool results for '{parsed['action']}'")
                         return AgentResult(
                             response=self._fallback_response(query, steps, observation),
                             steps=steps,
@@ -397,6 +403,8 @@ class BaseAgent:
                             iterations=iteration,
                             error=observation,
                         )
+                else:
+                    consecutive_errors = 0
 
             return AgentResult(
                 response=self._fallback_response(query, steps),
@@ -421,4 +429,9 @@ class BaseAgent:
 
     def _post_process(self, response: str, steps: list[dict]) -> str:
         """Override in sub-classes to refine the final response."""
-        return response
+        if not response:
+            return response
+        cleaned = response.strip()
+        if "RESPONSE:" in cleaned:
+            cleaned = cleaned.split("RESPONSE:", 1)[1].strip()
+        return cleaned

@@ -311,6 +311,48 @@ class EnhancedDocumentKit:
                 )
             )
 
+        if hasattr(self, "ocr_extract_blocks"):
+            registry.register(
+                Tool(
+                    name="ocr_extract_blocks",
+                    description=(
+                        "Extract layout-aware blocks (text, title, metadata, tables with content_md, "
+                        "images with visual descriptions) from document pages."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "doc_name": {"type": "string", "description": "Document name or ID."},
+                            "page_num": {"type": "integer", "description": "Optional page number. If omitted, extracts all pages.", "default": None},
+                        },
+                        "required": ["doc_name"],
+                    },
+                    func=self.ocr_extract_blocks,
+                )
+            )
+
+        if hasattr(self, "ocr_page_blocks"):
+            registry.register(
+                Tool(
+                    name="ocr_page_blocks",
+                    description=(
+                        "Extract bilingual Arabic and English layout blocks (titles, text, "
+                        "markdown tables with content_md, and images with descriptions) for a specific page number."
+                    ),
+                    parameters={
+                        "type": "object",
+                        "properties": {
+                            "doc_name": {"type": "string", "description": "Document name or ID."},
+                            "page_num": {"type": "integer", "description": "1-indexed page number to extract blocks from."},
+                            "language": {"type": "string", "description": "Target language: 'auto', 'ar', 'en', or 'mixed'.", "default": "auto"},
+                            "force_ocr": {"type": "boolean", "description": "Force vision OCR re-extraction.", "default": False},
+                        },
+                        "required": ["doc_name", "page_num"],
+                    },
+                    func=self.ocr_page_blocks,
+                )
+            )
+
         if hasattr(self, "google_ai_parse_document"):
             registry.register(
                 Tool(
@@ -834,15 +876,32 @@ class EnhancedDocumentKit:
     # ------------------------------------------------------------------
 
     def _find_document(self, doc_name: str) -> Optional[PDFDocument]:
-        if (not self._doc_map or len(self._doc_map) != len(self.documents)) and self.documents:
+        if not self.documents:
+            return None
+        if (not self._doc_map or len(self._doc_map) != len(self.documents)):
             self._doc_map = {d.name: d for d in self.documents}
-        if doc_name in self._doc_map:
-            return self._doc_map[doc_name]
-        lower = doc_name.lower()
+
+        # If only 1 document is in the bundle, resolve to it automatically
+        if len(self.documents) == 1:
+            return self.documents[0]
+
+        clean_doc = str(doc_name or "").strip()
+        if not clean_doc or clean_doc.lower() in ("document", "current", "file", "default"):
+            return self.documents[0]
+
+        if clean_doc in self._doc_map:
+            return self._doc_map[clean_doc]
+
+        lower = clean_doc.lower()
+        base_target = Path(clean_doc).stem.lower()
         for name, doc in self._doc_map.items():
+            base_name = Path(name).stem.lower()
             if lower in name.lower() or name.lower() in lower:
                 return doc
-        return None
+            if base_target == base_name or base_target in base_name or base_name in base_target:
+                return doc
+
+        return self.documents[0]
 
     def _list_available_error(self) -> str:
         names = ", ".join(self._doc_map.keys()) if self._doc_map else "none"
@@ -913,6 +972,65 @@ class EnhancedDocumentKit:
             return service.ocr_extract_contract(Path(file_path), page_num)
         except Exception as exc:
             return f"ERROR: Contract OCR failed: {exc}"
+
+    # ------------------------------------------------------------------
+    # Tool: ocr_extract_blocks (Layout Blocks: text, title, tables, images)
+    # ------------------------------------------------------------------
+
+    def ocr_extract_blocks(self, doc_name: str, page_num: Optional[int] = None) -> str:
+        """Extract layout-aware blocks (text, title, metadata, tables with content_md, images with descriptions)."""
+        doc = self._find_document(doc_name)
+        if doc is None:
+            return self._list_available_error()
+
+        file_path = getattr(doc, "file_path", None) or getattr(doc, "path", None)
+        if not file_path:
+            return f"ERROR: No file path available for '{doc_name}'."
+
+        try:
+            import json
+            from backend.agent.tools.ocr import OcrService
+
+            service = OcrService(llm=self.llm)
+            data = service.ocr_extract_blocks(Path(file_path), page_num)
+            return json.dumps(data, ensure_ascii=False)
+        except Exception as exc:
+            return f"ERROR: Layout blocks extraction failed: {exc}"
+
+    # ------------------------------------------------------------------
+    # Tool: ocr_page_blocks (Bilingual Arabic & English Blocks by Page)
+    # ------------------------------------------------------------------
+
+    def ocr_page_blocks(
+        self,
+        doc_name: str,
+        page_num: int,
+        language: str = "auto",
+        force_ocr: bool = False,
+    ) -> str:
+        """Extract bilingual Arabic and English layout blocks for a specific page."""
+        doc = self._find_document(doc_name)
+        if doc is None:
+            return self._list_available_error()
+
+        file_path = getattr(doc, "file_path", None) or getattr(doc, "path", None)
+        if not file_path:
+            return f"ERROR: No file path available for '{doc_name}'."
+
+        try:
+            import json
+            from backend.agent.tools.ocr import OcrService
+
+            service = OcrService(llm=self.llm)
+            data = service.ocr_read_page_blocks(
+                Path(file_path),
+                page_number=page_num,
+                language=language,
+                force_ocr=force_ocr,
+            )
+            return json.dumps(data, ensure_ascii=False)
+        except Exception as exc:
+            return f"ERROR: Failed to extract blocks for page {page_num}: {exc}"
 
     # ------------------------------------------------------------------
     # Tool: google_ai_parse_document (Google AI Document Intelligence)

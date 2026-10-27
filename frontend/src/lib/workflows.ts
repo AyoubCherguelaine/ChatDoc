@@ -65,15 +65,6 @@ export const workflows: Workflow[] = [
     color: "violet",
   },
   {
-    id: "compare",
-    title: "Compare documents",
-    description: "Spot agreements and contradictions across sources.",
-    prompt:
-      "Search across all loaded documents for the key topics and compare how each document treats them. Identify agreements, discrepancies, and what each document uniquely contributes. Cite document name and page for every claim.",
-    mode: "comparison",
-    color: "amber",
-  },
-  {
     id: "factcheck",
     title: "Fact-check claims",
     description: "Verify what the document says is true.",

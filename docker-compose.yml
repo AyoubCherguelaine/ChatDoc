@@ -83,7 +83,7 @@ services:
       STORAGE_BACKEND: auto
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       CHAT_MODELS: ${CHAT_MODELS:-}
-      DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-4o}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-6-luna}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       JWT_SECRET: ${JWT_SECRET:-docuchat-production-secret-key-32bytes-minimum-security-token-2026}
       ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
@@ -125,7 +125,7 @@ services:
       MINIO_SECURE: "0"
       STORAGE_BACKEND: auto
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-4o}
+      DEFAULT_MODEL: ${DEFAULT_MODEL:-gpt-6-luna}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
       UPLOAD_DIR: /app/backend/uploads
       INDEX_DIR: /app/backend/faiss_indexes

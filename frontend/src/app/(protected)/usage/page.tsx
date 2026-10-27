@@ -36,7 +36,7 @@ export default function ApiUsagePage() {
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
   const [regenerating, setRegenerating] = useState(false);
-  const [activeCodeTab, setActiveCodeTab] = useState<"curl" | "python">("curl");
+  const [activeCodeTab, setActiveCodeTab] = useState<"curl" | "python" | "typescript">("curl");
   const [error, setError] = useState("");
 
   const loadData = async () => {
@@ -329,40 +329,138 @@ export default function ApiUsagePage() {
             >
               Python
             </button>
+            <button
+              onClick={() => setActiveCodeTab("typescript")}
+              className={`rounded px-3 py-1 text-xs font-semibold transition ${
+                activeCodeTab === "typescript" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
+              }`}
+            >
+              TypeScript / Node
+            </button>
           </div>
         </div>
 
         <div className="overflow-hidden rounded-xl bg-slate-900 p-4 text-xs font-mono text-emerald-400 shadow-inner">
-          {activeCodeTab === "curl" ? (
+          {activeCodeTab === "curl" && (
             <pre className="overflow-x-auto leading-relaxed">
-{`# Execute Document AI Invoice Processing with company API key
-curl -X POST "http://localhost:8000/api/v1/services/invoice" \\
+{`# Execute Document AI Pipeline with company API key
+curl -X POST "http://localhost:8000/api/v1/pipeline/run" \\
   -H "X-API-Key: ${displayKey}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "document_id": "YOUR_DOCUMENT_UUID"
+    "service": "invoice",
+    "document_id": "YOUR_DOCUMENT_UUID",
+    "output_format": "json"
   }'`}
             </pre>
-          ) : (
+          )}
+
+          {activeCodeTab === "python" && (
             <pre className="overflow-x-auto leading-relaxed">
 {`import requests
 
-url = "http://localhost:8000/api/v1/services/invoice"
+url = "http://localhost:8000/api/v1/pipeline/run"
 headers = {
     "X-API-Key": "${displayKey}",
     "Content-Type": "application/json"
 }
 payload = {
-    "document_id": "YOUR_DOCUMENT_UUID"
+    "service": "invoice",
+    "document_id": "YOUR_DOCUMENT_UUID",
+    "output_format": "json"
 }
 
 response = requests.post(url, headers=headers, json=payload)
 data = response.json()
 
+print(f"Status: {data['status']}")
 print(f"Credits Remaining: {data['creditsRemaining']}")
-print(f"Result: {data['result']}")`}
+print(f"Extracted Data: {data.get('data')}")`}
             </pre>
           )}
+
+          {activeCodeTab === "typescript" && (
+            <pre className="overflow-x-auto leading-relaxed">
+{`// Run in Node.js, Next.js API route, or AWS Lambda
+async function extractDocumentData() {
+  const response = await fetch("http://localhost:8000/api/v1/pipeline/run", {
+    method: "POST",
+    headers: {
+      "X-API-Key": "${displayKey}",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      service: "invoice",
+      document_id: "YOUR_DOCUMENT_UUID",
+      output_format: "json",
+    }),
+  });
+
+  const result = await response.json();
+  console.log("Structured JSON:", result.data);
+  return result.data;
+}
+
+extractDocumentData().catch(console.error);`}
+            </pre>
+          )}
+        </div>
+      </div>
+
+      {/* Enterprise SaaS API Endpoints Reference */}
+      <div className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+        <div className="mb-4">
+          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <Sparkles size={14} className="text-teal-700" /> API Architecture
+          </div>
+          <h2 className="mt-1 text-lg font-semibold text-slate-900">
+            Core Enterprise SaaS Endpoints
+          </h2>
+          <p className="text-xs text-slate-500">
+            Unified REST endpoints for ETL ingestion, asynchronous queue processing, and OCR layout inspection.
+          </p>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
+            <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
+              <span className="rounded bg-teal-100 px-1.5 py-0.5 text-teal-800 text-[10px] font-bold">POST</span>
+              <span>/api/v1/pipeline/run</span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Run any document AI service (invoice, contract, resume, receipt, compliance, tables) synchronously or asynchronously with custom schema &amp; prompts.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
+            <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
+              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 text-[10px] font-bold">POST</span>
+              <span>/api/v1/documents/upload</span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Ingest multi-page PDF, DOCX, XLSX, or scan images. Triggers OCR layout extraction, spatial chunking, and vector indexing.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
+            <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
+              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-blue-800 text-[10px] font-bold">GET</span>
+              <span>/api/v1/pipeline/jobs/{'{job_id}'}</span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Poll async batch pipeline jobs submitted via <code className="text-slate-800">async: true</code>. Returns progress, status, and payload.
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-1.5">
+            <div className="flex items-center gap-2 font-mono text-xs font-semibold text-slate-900">
+              <span className="rounded bg-purple-100 px-1.5 py-0.5 text-purple-800 text-[10px] font-bold">GET</span>
+              <span>/api/v1/ocr/document/{'{id}'}</span>
+            </div>
+            <p className="text-xs text-slate-600">
+              Retrieve full OCR word blocks, bounding box coordinates, line geometry, and recognized text for all pages.
+            </p>
+          </div>
         </div>
       </div>
 

@@ -111,6 +111,14 @@ def parse_agent_output(text: str) -> dict:
     # Clean up the action — it might have trailing punctuation
     action = action.rstrip(".,;:")
 
+    # Fallback: if the LLM output direct JSON or content without standard RESPONSE: tag
+    if not response and action == "FINAL":
+        if "ACTION: FINAL" in text:
+            after_final = text.split("ACTION: FINAL", 1)[1].strip()
+            response = after_final
+        else:
+            response = text
+
     return {
         "thought": thought,
         "action": action,
@@ -137,8 +145,8 @@ def format_scratchpad(steps: list[dict]) -> str:
         if params:
             lines.append(f"  Params: {json.dumps(params)}")
         obs = step.get("observation", "")
-        if len(obs) > 500:
-            obs = obs[:500] + "... [truncated]"
+        if len(obs) > 3500:
+            obs = obs[:3500] + "... [truncated]"
         lines.append(f"  Observation: {obs}")
         lines.append("")
     return "\n".join(lines)

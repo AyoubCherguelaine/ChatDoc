@@ -138,3 +138,48 @@ def test_settings_load_root_credentials_even_with_backend_env(tmp_path, monkeypa
     loaded = runpy.run_path(str(config))["settings"]
     assert loaded.OPENAI_API_KEY == "local-test-placeholder"
     assert loaded.DEBUG
+
+
+def test_playground_presets(client):
+    res = client.get("/api/playground/presets")
+    assert res.status_code == 200
+    data = res.json()
+    assert "presets" in data
+    assert "invoice" in data["presets"]
+    assert "contract" in data["presets"]
+    assert "models" in data
+    invoice_preset = data["presets"]["invoice"]
+    assert "default_schema" in invoice_preset
+    assert "sample_text" in invoice_preset
+
+
+def test_playground_run_with_sample_text(client, monkeypatch):
+    from unittest.mock import MagicMock
+    from backend.agent.agents.base import AgentResult
+
+    mock_agent = MagicMock()
+    mock_agent.run.return_value = AgentResult(
+        response='{"invoice_number": "INV-2026-999", "total_amount": 500.0}',
+        success=True,
+        iterations=2,
+        steps=[{"thought": "Parsing sample", "action": "none", "observation": "ok"}],
+    )
+    monkeypatch.setattr(server.rag, "_build_agent", lambda *a, **kw: mock_agent)
+
+    payload = {
+        "service": "invoice",
+        "text_content": "Invoice INV-2026-999 Total: $500",
+        "user_prompt": "Extract invoice fields",
+        "schema_override": {"invoice_number": "str", "total_amount": "float"},
+        "model": "gpt-4o",
+    }
+    res = client.post("/api/playground/run", json=payload)
+    assert res.status_code == 200
+    result = res.json()
+    assert result["success"] is True
+    assert result["service"] == "invoice"
+    assert result["data"]["invoice_number"] == "INV-2026-999"
+    assert result["data"]["total_amount"] == 500.0
+    assert result["latencyMs"] >= 0
+    assert "steps" in result
+

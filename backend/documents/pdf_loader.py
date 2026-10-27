@@ -42,6 +42,7 @@ class PageText:
     total_pages: int
     tables: list[str] = field(default_factory=list)
     blocks: list[str] = field(default_factory=list)
+    structured_blocks: list[dict] = field(default_factory=list)
     structured_json: Optional[dict] = None
     is_ocr: bool = False
 
@@ -172,6 +173,14 @@ def _fitz_loader(
         except Exception:
             pass
 
+        # 5. Extract structured layout blocks (text, title, metadata, tables with content_md, images)
+        page_structured_blocks: list[dict] = []
+        try:
+            from backend.agent.tools.ocr import extract_native_page_blocks
+            page_structured_blocks = extract_native_page_blocks(Path(file_path), i + 1)
+        except Exception:
+            pass
+
         pages.append(
             PageText(
                 page_number=i + 1,
@@ -180,6 +189,7 @@ def _fitz_loader(
                 total_pages=total,
                 tables=table_md_list,
                 blocks=block_texts,
+                structured_blocks=page_structured_blocks,
                 structured_json=page_structured_json,
                 is_ocr=is_ocr,
             )

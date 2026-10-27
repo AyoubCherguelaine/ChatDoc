@@ -338,9 +338,14 @@ def _stream_conversational(bundle: IndexBundle, query: str, history: list, model
             raise
 
 
-def _build_toolkit(bundle: IndexBundle, model_name: str, enhanced: bool = False):
+def _build_toolkit(
+    bundle: IndexBundle,
+    model_name: str,
+    enhanced: bool = False,
+    temperature: Optional[float] = None,
+):
     """Build a DocumentToolKit (or EnhancedDocumentKit) for agent use."""
-    llm = get_llm(model_name=model_name)
+    llm = get_llm(model_name=model_name, temperature=temperature)
     kit_cls = EnhancedDocumentKit if enhanced else DocumentToolKit
     return kit_cls(
         vector_store=bundle.vector_store,
@@ -349,116 +354,160 @@ def _build_toolkit(bundle: IndexBundle, model_name: str, enhanced: bool = False)
     )
 
 
-def _build_agent(bundle: IndexBundle, model_name: str, mode: str) -> BaseAgent:
+def create_text_bundle(text: str, name: str = "sample_document.txt") -> IndexBundle:
+    """Create a lightweight in-memory IndexBundle from raw text for playground and quick runs."""
+    import uuid
+    from backend.documents.pdf_loader import PageText, PDFDocument
+    from langchain_core.documents import Document as LCDocument
+
+    doc_id = "mem-" + str(uuid.uuid4())[:8]
+    bundle = IndexBundle(doc_id)
+    pdf_doc = PDFDocument(
+        name=name,
+        pages=[PageText(page_number=1, text=text, doc_name=name, total_pages=1)],
+        file_path="",
+    )
+    bundle.pdf_docs = [pdf_doc]
+
+    chunks = [LCDocument(page_content=text, metadata={"page": 1, "source": name, "chunk_index": 0})]
+    try:
+        emb = SmartEmbedding(_emb_config())
+        bundle.vector_store = SmartVectorStore(embedding=emb).build(chunks)
+    except Exception as exc:
+        logger.warning("Could not build SmartVectorStore for text bundle, falling back: %s", exc)
+        from langchain_community.vectorstores import FAISS
+        from langchain_community.embeddings import FakeEmbeddings
+        bundle.vector_store = FAISS.from_documents(chunks, FakeEmbeddings(size=1536))
+
+    with _lock:
+        _registry[doc_id] = bundle
+    return bundle
+
+
+def _build_agent(
+    bundle: IndexBundle,
+    model_name: str,
+    mode: str,
+    system_prompt: Optional[str] = None,
+    temperature: Optional[float] = None,
+) -> BaseAgent:
     """Factory: build the appropriate agent for the requested mode."""
     use_enhanced = mode in {
         "extraction", "factcheck", "coordinator", "invoice", "contract", "google_ai",
         "receipt", "resume", "compliance", "form_parser",
         "redaction", "classifier", "financial_statement", "translation", "anomaly_audit",
     }
-    toolkit = _build_toolkit(bundle, model_name, enhanced=use_enhanced)
+    toolkit = _build_toolkit(bundle, model_name, enhanced=use_enhanced, temperature=temperature)
+
+    def _cfg(max_iter: int = 10):
+        return BaseAgentConfig(
+            max_iterations=max_iter,
+            verbose=False,
+            system_prompt=system_prompt or "",
+            temperature=temperature,
+        )
 
     if mode == "summary":
         agent: BaseAgent = SummaryAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=8, verbose=False),
+            config=_cfg(8),
         )
     elif mode == "research":
         agent = ResearchAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "extraction":
         agent = ExtractionAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=8, verbose=False),
+            config=_cfg(8),
         )
     elif mode == "comparison":
         agent = ComparisonAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=8, verbose=False),
+            config=_cfg(8),
         )
     elif mode == "factcheck":
         agent = FactCheckAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=6, verbose=False),
+            config=_cfg(6),
         )
     elif mode == "invoice":
         agent = InvoiceAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "contract":
         agent = ContractAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=12, verbose=False),
+            config=_cfg(12),
         )
     elif mode == "google_ai":
         agent = GoogleAIDocumentAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "receipt":
         agent = ReceiptAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "resume":
         agent = ResumeAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "compliance":
         agent = ComplianceAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "form_parser":
         agent = FormParserAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "redaction":
         agent = RedactionAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "classifier":
         agent = ClassifierAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=8, verbose=False),
+            config=_cfg(8),
         )
     elif mode == "financial_statement":
         agent = FinancialStatementAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "translation":
         agent = TranslationAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "anomaly_audit":
         agent = AnomalyAuditAgent(
             llm=toolkit.llm,
             tool_kit=toolkit,
-            config=BaseAgentConfig(max_iterations=10, verbose=False),
+            config=_cfg(10),
         )
     elif mode == "coordinator":
         coordinator = CoordinatorAgent(
