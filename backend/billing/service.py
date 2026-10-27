@@ -233,7 +233,7 @@ class CompanyBillingService:
                     user_id        UUID NOT NULL UNIQUE REFERENCES docuchat.users(id) ON DELETE CASCADE,
                     company_name   TEXT NOT NULL DEFAULT 'Enterprise Free Trial',
                     plan_tier      TEXT NOT NULL DEFAULT 'free_trial',
-                    total_credits  INT NOT NULL DEFAULT 1200,
+                    total_credits  INT NOT NULL DEFAULT 250,
                     used_credits   INT NOT NULL DEFAULT 0,
                     api_key        TEXT UNIQUE NOT NULL,
                     api_key_prefix TEXT NOT NULL,

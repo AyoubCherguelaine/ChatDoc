@@ -27,9 +27,9 @@ def fresh_billing():
 def test_company_free_trial_initial_credits(fresh_billing):
     user_id = str(uuid.uuid4())
     account = fresh_billing.get_or_create_company(user_id, company_name="Acme Corp")
-    assert account.total_credits == 1200
+    assert account.total_credits == 250
     assert account.used_credits == 0
-    assert account.remaining_credits == 1200
+    assert account.remaining_credits == 250
     assert account.plan_tier == "free_trial"
     assert account.api_key.startswith("docu_live_")
     assert account.api_key_prefix.startswith("docu_live_")
