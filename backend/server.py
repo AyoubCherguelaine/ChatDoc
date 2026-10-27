@@ -2073,8 +2073,14 @@ def get_playground_presets(user: CurrentUser):
     if not model_list:
         model_list = [settings.DEFAULT_MODEL]
     models = [{"id": m, "name": m, "description": f"Model configured in .env ({m})"} for m in model_list]
+    # Sanitize presets to hide internal system prompts from clients
+    sanitized_presets = {}
+    for key, data in SERVICE_PRESETS.items():
+        preset_copy = dict(data)
+        preset_copy.pop("default_system_prompt", None)
+        sanitized_presets[key] = preset_copy
     return {
-        "presets": SERVICE_PRESETS,
+        "presets": sanitized_presets,
         "models": models,
         "defaultModel": settings.DEFAULT_MODEL,
     }

@@ -70,7 +70,6 @@ export default function PlaygroundPage() {
   const [uploadError, setUploadError] = useState<string>("");
 
   // Prompt & Schema
-  const [systemPrompt, setSystemPrompt] = useState<string>("");
   const [userPrompt, setUserPrompt] = useState<string>("");
   const [schemaText, setSchemaText] = useState<string>("");
 
@@ -79,7 +78,6 @@ export default function PlaygroundPage() {
   const [result, setResult] = useState<PlaygroundRunResult | null>(null);
   const [error, setError] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"json" | "blocks" | "rendered" | "steps">("json");
-  const [configTab, setConfigTab] = useState<"schema" | "system">("schema");
   const [copied, setCopied] = useState<boolean>(false);
 
   // API Code Documentation States
@@ -125,7 +123,6 @@ export default function PlaygroundPage() {
         const current = presetData.presets[serviceKey] || presetData.presets["invoice"];
         if (current) {
           setPreset(current);
-          setSystemPrompt(current.default_system_prompt || "");
           setUserPrompt(current.default_query || "");
           setSchemaText(
             current.default_schema ? JSON.stringify(current.default_schema, null, 2) : ""
@@ -217,7 +214,6 @@ export default function PlaygroundPage() {
     const payload: any = {
       service: serviceKey,
       model: defaultEnvModel,
-      system_prompt: systemPrompt || undefined,
       user_prompt: userPrompt || undefined,
       schema_override: parsedSchema,
       output_format: "json",
@@ -295,11 +291,6 @@ export default function PlaygroundPage() {
       promptSnippet = `    "user_prompt": ${JSON.stringify(userPrompt)},\n`;
     }
 
-    let systemSnippet = "";
-    if (systemPrompt.trim()) {
-      systemSnippet = `    "system_prompt": ${JSON.stringify(systemPrompt)},\n`;
-    }
-
     let asyncSnippet = "";
     if (apiModalAsync) {
       asyncSnippet = `    "async": true,\n    "webhook_url": "https://your-api.company.com/webhooks/doctool",\n`;
@@ -311,9 +302,9 @@ curl -X POST "http://localhost:8000/api/v1/pipeline/run" \\
   -H "Content-Type: application/json" \\
   -d '{
     "service": "${serviceKey}",
-${inputSnippet}${promptSnippet}${systemSnippet}${schemaSnippet}${asyncSnippet}    "output_format": "json"
+${inputSnippet}${promptSnippet}${schemaSnippet}${asyncSnippet}    "output_format": "json"
   }'`;
-  }, [apiKey, serviceKey, sourceType, selectedDocId, textContent, schemaText, userPrompt, systemPrompt, apiModalAsync]);
+  }, [apiKey, serviceKey, sourceType, selectedDocId, textContent, schemaText, userPrompt, apiModalAsync]);
 
   const pythonCode = useMemo(() => {
     const isDoc = sourceType === "document" && selectedDocId;
@@ -327,7 +318,6 @@ ${inputSnippet}${promptSnippet}${systemSnippet}${schemaSnippet}${asyncSnippet}  
       body.text_content = (textContent || "").slice(0, 300);
     }
     if (userPrompt.trim()) body.user_prompt = userPrompt;
-    if (systemPrompt.trim()) body.system_prompt = systemPrompt;
     if (schemaText.trim()) {
       try {
         body.schema_override = JSON.parse(schemaText);
@@ -359,7 +349,7 @@ if response.status_code == 200:
     print("Structured Extraction:", data.get("data"))
 else:
     print(f"Error {response.status_code}:", data.get("detail"))`;
-  }, [apiKey, serviceKey, sourceType, selectedDocId, textContent, schemaText, userPrompt, systemPrompt, apiModalAsync]);
+  }, [apiKey, serviceKey, sourceType, selectedDocId, textContent, schemaText, userPrompt, apiModalAsync]);
 
   const typescriptCode = useMemo(() => {
     const isDoc = sourceType === "document" && selectedDocId;
@@ -373,7 +363,6 @@ else:
       body.text_content = (textContent || "").slice(0, 300);
     }
     if (userPrompt.trim()) body.user_prompt = userPrompt;
-    if (systemPrompt.trim()) body.system_prompt = systemPrompt;
     if (schemaText.trim()) {
       try {
         body.schema_override = JSON.parse(schemaText);
@@ -409,7 +398,7 @@ async function runDocumentPipeline() {
 }
 
 runDocumentPipeline().catch(console.error);`;
-  }, [apiKey, serviceKey, sourceType, selectedDocId, textContent, schemaText, userPrompt, systemPrompt, apiModalAsync]);
+  }, [apiKey, serviceKey, sourceType, selectedDocId, textContent, schemaText, userPrompt, apiModalAsync]);
 
   const workflowCode = useMemo(() => {
     return `# ==============================================================================
@@ -617,7 +606,7 @@ console.log("TTL Status:", status);`;
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isRunning, sourceType, selectedDocId, textContent, schemaText, userPrompt, systemPrompt]);
+  }, [isRunning, sourceType, selectedDocId, textContent, schemaText, userPrompt]);
 
   if (loading) {
     return (
@@ -843,98 +832,57 @@ console.log("TTL Status:", status);`;
               />
             </div>
 
-            {/* Studio Advanced Configuration: JSON Schema & System Prompt Tabs */}
+            {/* Target JSON Schema Configuration (System Prompt is strictly internal) */}
             <div className="space-y-2 pt-1 border-t border-slate-100">
               <div className="flex items-center justify-between">
-                <div className="inline-flex rounded-md border border-slate-200 bg-slate-100 p-0.5 text-xs font-medium">
-                  <button
-                    type="button"
-                    onClick={() => setConfigTab("schema")}
-                    className={`rounded px-2.5 py-1 text-xs transition ${
-                      configTab === "schema"
-                        ? "bg-white text-slate-900 font-semibold shadow-2xs"
-                        : "text-slate-600 hover:text-slate-900"
+                <span className="text-xs font-semibold text-slate-800">
+                  Target JSON Schema
+                </span>
+
+                <div className="flex items-center gap-2 text-[11px]">
+                  <span
+                    className={`font-mono text-[10px] font-medium px-1.5 py-0.5 rounded ${
+                      isSchemaValid
+                        ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                        : "bg-rose-50 text-rose-700 border border-rose-200"
                     }`}
                   >
-                    Target JSON Schema
+                    {isSchemaValid ? "Valid JSON" : "Invalid JSON"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try {
+                        setSchemaText(JSON.stringify(JSON.parse(schemaText), null, 2));
+                      } catch {}
+                    }}
+                    disabled={!isSchemaValid}
+                    className="text-slate-600 hover:text-slate-900 disabled:opacity-40"
+                  >
+                    Format
                   </button>
+                  <span className="text-slate-300">•</span>
                   <button
                     type="button"
-                    onClick={() => setConfigTab("system")}
-                    className={`rounded px-2.5 py-1 text-xs transition ${
-                      configTab === "system"
-                        ? "bg-white text-slate-900 font-semibold shadow-2xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
+                    onClick={() =>
+                      setSchemaText(
+                        preset?.default_schema ? JSON.stringify(preset.default_schema, null, 2) : ""
+                      )
+                    }
+                    className="text-teal-700 hover:underline"
                   >
-                    System Instructions
+                    Reset
                   </button>
                 </div>
-
-                {configTab === "schema" ? (
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <span
-                      className={`font-mono text-[10px] font-medium px-1.5 py-0.5 rounded ${
-                        isSchemaValid
-                          ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                          : "bg-rose-50 text-rose-700 border border-rose-200"
-                      }`}
-                    >
-                      {isSchemaValid ? "Valid JSON" : "Invalid JSON"}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        try {
-                          setSchemaText(JSON.stringify(JSON.parse(schemaText), null, 2));
-                        } catch {}
-                      }}
-                      disabled={!isSchemaValid}
-                      className="text-slate-600 hover:text-slate-900 disabled:opacity-40"
-                    >
-                      Format
-                    </button>
-                    <span className="text-slate-300">•</span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSchemaText(
-                          preset?.default_schema ? JSON.stringify(preset.default_schema, null, 2) : ""
-                        )
-                      }
-                      className="text-teal-700 hover:underline"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setSystemPrompt(preset?.default_system_prompt || "")}
-                    className="text-[11px] text-teal-700 hover:underline flex items-center gap-1 font-medium"
-                  >
-                    <RotateCcw size={10} /> Reset
-                  </button>
-                )}
               </div>
 
-              {configTab === "schema" ? (
-                <textarea
-                  value={schemaText}
-                  onChange={(e) => setSchemaText(e.target.value)}
-                  rows={6}
-                  placeholder="Target JSON schema template..."
-                  className="w-full rounded-lg border border-slate-800 bg-[#0c1222] p-3 font-mono text-[11px] leading-relaxed text-emerald-400 focus:outline-none"
-                />
-              ) : (
-                <textarea
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  rows={6}
-                  placeholder="System prompt instructions..."
-                  className="w-full rounded-lg border border-slate-200 bg-[#fafbfc] p-3 font-mono text-[11px] leading-relaxed text-slate-800 focus:border-teal-600 focus:outline-none"
-                />
-              )}
+              <textarea
+                value={schemaText}
+                onChange={(e) => setSchemaText(e.target.value)}
+                rows={7}
+                placeholder="Target JSON schema template..."
+                className="w-full rounded-lg border border-slate-800 bg-[#0c1222] p-3 font-mono text-[11px] leading-relaxed text-emerald-400 focus:outline-none"
+              />
             </div>
           </div>
         </div>

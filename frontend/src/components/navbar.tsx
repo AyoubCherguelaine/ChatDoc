@@ -23,6 +23,7 @@ import {
   FileCheck2,
   Users,
   Building,
+  LayoutDashboard,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { Brand } from "@/components/brand";
@@ -31,11 +32,12 @@ import { fetchCompanyAccount, type CompanyAccountInfo } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 function getPageTitle(pathname: string): string {
+  if (pathname.startsWith("/overview")) return "Platform Overview";
   if (pathname.startsWith("/advanced-ocr")) return "Advanced OCR";
   if (pathname.startsWith("/services")) return "AI Services";
   if (pathname.startsWith("/playground")) return "Playground & Docs";
   if (pathname.startsWith("/usage")) return "Credits & Usage Logs";
-  if (pathname.startsWith("/conversations")) return "Conversations";
+  if (pathname.startsWith("/conversations")) return "Chats";
   if (pathname.startsWith("/chat")) return "Document Chat";
   return "Document AI";
 }
@@ -78,12 +80,31 @@ export function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const operationsLinks = [
-    { href: "/advanced-ocr", label: "Advanced OCR", icon: ScanText },
-    { href: "/services", label: "AI Services", icon: Bot },
-    { href: "/playground", label: "Playground & Docs", icon: Code2 },
-    { href: "/usage", label: "Credits & Usage", icon: Zap },
-    { href: "/conversations", label: "Conversations", icon: MessageSquare },
+  const mainNavLinks = [
+    {
+      href: "/overview",
+      label: "Overview",
+      icon: LayoutDashboard,
+      isActive: (p: string) => p.startsWith("/overview"),
+    },
+    {
+      href: "/conversations",
+      label: "Chats",
+      icon: MessageSquare,
+      isActive: (p: string) => p.startsWith("/conversations") || p.startsWith("/chat"),
+    },
+    {
+      href: "/advanced-ocr",
+      label: "Advanced OCR",
+      icon: ScanText,
+      isActive: (p: string) => p.startsWith("/advanced-ocr"),
+    },
+    {
+      href: "/services",
+      label: "AI Services",
+      icon: Bot,
+      isActive: (p: string) => p.startsWith("/services"),
+    },
   ];
 
   function copyApiKey() {
@@ -123,7 +144,7 @@ export function Navbar() {
           </div>
 
           <div className="sm:hidden">
-            <Brand />
+            <Brand href="/overview" />
           </div>
         </div>
 
@@ -309,7 +330,7 @@ export function Navbar() {
       >
         {/* Brand Header */}
         <div className="mb-8 flex items-center justify-between px-2">
-          <Brand />
+          <Brand href="/overview" />
           <button
             className="text-slate-400 lg:hidden"
             aria-label="Close navigation"
@@ -319,38 +340,68 @@ export function Navbar() {
           </button>
         </div>
 
-        {/* Operations Label */}
+        {/* Operations / Workspace Label */}
         <p className="eyebrow mb-2 px-3 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-          Operations
+          Workspace
         </p>
 
-        {/* Operations Navigation Links */}
-        <nav aria-label="Operations navigation" className="space-y-1">
-          {operationsLinks.map(({ href, label, icon: Icon }) => (
+        {/* Primary Navigation Links */}
+        <nav aria-label="Main operations navigation" className="space-y-1">
+          {mainNavLinks.map(({ href, label, icon: Icon, isActive }) => {
+            const active = isActive(pathname);
+            return (
+              <Link
+                key={href}
+                href={href}
+                onClick={() => setSidebarOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100",
+                  active && "bg-[#e9f4ef] !text-[#087f74] font-semibold",
+                )}
+              >
+                <Icon size={17} className={active ? "text-[#087f74]" : "text-slate-500"} />
+                <span>{label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Secondary Developer & Quota Tools */}
+        <div className="mt-5 pt-4 border-t border-slate-100">
+          <p className="eyebrow mb-2 px-3 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            Developer & Quota
+          </p>
+          <nav aria-label="Developer navigation" className="space-y-1">
             <Link
-              key={href}
-              href={href}
+              href="/playground"
               onClick={() => setSidebarOpen(false)}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100",
-                pathname === href && "bg-[#e9f4ef] !text-[#087f74] font-semibold",
+                "flex items-center gap-3 rounded-xl px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-100",
+                pathname.startsWith("/playground") && "bg-[#e9f4ef] !text-[#087f74] font-semibold",
               )}
             >
-              <Icon size={17} />
-              <span>{label}</span>
-              {label === "Credits & Usage" && (
-                <span className="ml-auto rounded bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold text-teal-800">
-                  LOGS
-                </span>
-              )}
-              {label === "Playground & Docs" && (
-                <span className="ml-auto rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-slate-600">
-                  API
-                </span>
-              )}
+              <Code2 size={16} />
+              <span>Playground & Docs</span>
+              <span className="ml-auto rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-slate-600">
+                API
+              </span>
             </Link>
-          ))}
-        </nav>
+            <Link
+              href="/usage"
+              onClick={() => setSidebarOpen(false)}
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-100",
+                pathname.startsWith("/usage") && "bg-[#e9f4ef] !text-[#087f74] font-semibold",
+              )}
+            >
+              <Zap size={16} />
+              <span>Credits & Usage</span>
+              <span className="ml-auto rounded bg-teal-100 px-1.5 py-0.5 text-[9px] font-bold text-teal-800">
+                LOGS
+              </span>
+            </Link>
+          </nav>
+        </div>
 
         {/* Sidebar Footer Info */}
         <div className="mt-auto rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1 text-xs text-slate-500">

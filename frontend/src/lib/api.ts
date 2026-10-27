@@ -521,7 +521,7 @@ export interface PlaygroundPreset {
   description: string;
   recommended_model: string;
   default_temperature: number;
-  default_system_prompt: string;
+  default_system_prompt?: string;
   default_query: string;
   default_schema: any;
   sample_text: string;

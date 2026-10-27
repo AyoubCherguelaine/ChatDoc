@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { Layers } from "lucide-react";
-export function Brand({ light = false }: { light?: boolean }) {
+export function Brand({ light = false, href = "/" }: { light?: boolean; href?: string }) {
   return (
     <Link
-      href="/"
+      href={href}
       className={`inline-flex items-center gap-2.5 text-xl font-semibold tracking-tight ${light ? "text-white" : "text-[#192d35]"}`}
       aria-label="DOCTool home"
     >

@@ -151,6 +151,7 @@ def test_playground_presets(client):
     invoice_preset = data["presets"]["invoice"]
     assert "default_schema" in invoice_preset
     assert "sample_text" in invoice_preset
+    assert "default_system_prompt" not in invoice_preset
 
 
 def test_playground_run_with_sample_text(client, monkeypatch):
