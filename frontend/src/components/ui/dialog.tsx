@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { useLanguage } from "@/components/providers/language-provider";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 type DialogProps = {
@@ -20,6 +21,7 @@ export function Dialog({
   footer,
   className,
 }: DialogProps) {
+  const { t } = useLanguage();
   const ref = useRef<HTMLDialogElement>(null);
   const id = useId();
   useEffect(() => {
@@ -56,13 +58,13 @@ export function Dialog({
     >
       <button
         onClick={() => onOpenChange(false)}
-        className="absolute right-3 top-3 rounded p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
-        aria-label="Close"
+        className="absolute end-3 top-3 rounded p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition"
+        aria-label={t("Close")}
       >
         <X size={18} />
       </button>
       {title && (
-        <h2 id={`${id}-title`} className="pr-6 text-lg font-semibold">
+        <h2 id={`${id}-title`} className="pe-6 text-lg font-semibold">
           {title}
         </h2>
       )}
@@ -74,7 +76,7 @@ export function Dialog({
           {description}
         </p>
       )}
-      {open && <div className="mt-5">{children}</div>}
+      {open && <div className="mt-5 space-y-5">{children}</div>}
       {footer && <div className="mt-6 flex justify-end gap-2">{footer}</div>}
     </dialog>
   );

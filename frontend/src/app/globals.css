@@ -301,3 +301,45 @@ select {
   border-left-color: #10b981;
   color: #94a3b8;
 }
+
+/* Arabic uses local system fonts, without a font download dependency. */
+html[lang="ar"] body {
+  font-family: Tahoma, "Noto Sans Arabic", Arial, sans-serif;
+  line-height: 1.7;
+}
+
+html[lang="ar"] .eyebrow,
+html[lang="ar"] h1,
+html[lang="ar"] h2,
+html[lang="ar"] h3 {
+  letter-spacing: normal;
+}
+
+pre,
+code,
+[dir="ltr"] {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+pre {
+  text-align: start;
+}
+
+.markdown-content ul,
+.markdown-content ol {
+  padding-inline-start: 1.3rem;
+  padding-inline-end: 0;
+}
+
+.markdown-content th,
+.markdown-content td {
+  text-align: start;
+}
+
+html[dir="rtl"] .markdown-content blockquote {
+  border-left: 0;
+  border-right: 3px solid var(--accent);
+  padding-left: 0;
+  padding-right: 14px;
+}

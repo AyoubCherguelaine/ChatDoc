@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/components/providers/language-provider";
 
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
@@ -12,9 +13,11 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { ApiError } from "@/lib/api";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
 function LoginForm() {
+  const { t } = useLanguage();
   const search = useSearchParams();
   const router = useRouter();
   const { user, login, register } = useSession();
@@ -46,7 +49,7 @@ function LoginForm() {
       setError(
         err instanceof ApiError
           ? err.message
-          : (err as Error)?.message || "Something went wrong",
+          : (err as Error)?.message || t("Something went wrong"),
       );
     } finally {
       setSubmitting(false);
@@ -62,29 +65,22 @@ function LoginForm() {
             <Layers size={38} />
           </span>
           <h2 className="mt-9 max-w-lg text-5xl font-extrabold leading-tight tracking-tight">
-            A little less searching.
-            <br />
-            <span className="text-emerald-400">A lot more clarity.</span>
+            {t("Read your documents.")}<br />
+            <span className="text-emerald-400">{t("Find the details you need.")}</span>
           </h2>
           <p className="mt-6 max-w-md text-sm leading-7 text-slate-300">
-            Bring your documents, spreadsheets, and ideas together. Your next
-            insight is one good question away.
-          </p>
+            {t("Upload documents and spreadsheets. Ask questions about their contents or extract specific data.")}</p>
           <div className="mt-10 flex gap-3 text-[11px] text-emerald-200">
             <span className="rounded-full border border-emerald-800/80 bg-emerald-950/40 px-3.5 py-1">
-              PDF Documents
-            </span>
+              {t("PDF Documents")}</span>
             <span className="rounded-full border border-emerald-800/80 bg-emerald-950/40 px-3.5 py-1">
-              Word & DOCX
-            </span>
+              {t("Word & DOCX")}</span>
             <span className="rounded-full border border-emerald-800/80 bg-emerald-950/40 px-3.5 py-1">
-              Excel & Sheets
-            </span>
+              {t("Excel & Sheets")}</span>
           </div>
         </div>
         <p className="text-xs text-slate-400">
-          Your knowledge. A little more connected.
-        </p>
+          {t("Document chat, OCR and data extraction.")}</p>
       </aside>
 
       <div className="flex min-h-screen flex-col p-6 sm:p-12">
@@ -93,9 +89,8 @@ function LoginForm() {
             href="/"
             className="flex items-center gap-2 text-xs font-semibold text-slate-500 hover:text-emerald-600 dark:text-slate-400 dark:hover:text-emerald-400 transition"
           >
-            <ArrowLeft size={14} /> Back to home
-          </Link>
-          <ThemeToggle />
+            <ArrowLeft size={14} /> {t("Back to home")}</Link>
+          <LanguageToggle /><ThemeToggle />
         </div>
 
         <div className="mx-auto my-auto w-full max-w-sm py-12">
@@ -106,24 +101,24 @@ function LoginForm() {
             <CardHeader className="!px-0 !pt-0">
               <CardTitle className="text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
                 {mode === "login"
-                  ? "Welcome back."
-                  : "Make room for your next idea."}
+                  ? t("Sign in to DOCTool")
+                  : t("Create your account")}
               </CardTitle>
               <p className="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
                 {mode === "login"
-                  ? "Your documents and conversations are right where you left them."
-                  : "Create your personal knowledge workspace."}
+                  ? t("Sign in to use the document tools.")
+                  : t("Create an account to upload documents and use the services.")}
               </p>
             </CardHeader>
             <CardContent className="!px-0">
               <form onSubmit={handleSubmit} className="space-y-4">
                 {mode === "signup" && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="name">Name</Label>
+                    <Label htmlFor="name">{t("Name")}</Label>
                     <Input
                       id="name"
                       name="name"
-                      placeholder="Jane Doe"
+                      placeholder={t("Your name", "اسمك")}
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       required
@@ -132,11 +127,12 @@ function LoginForm() {
                   </div>
                 )}
                 <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">{t("Email")}</Label>
                   <Input
                     id="email"
                     name="email"
                     type="email"
+                    dir="ltr"
                     placeholder="jane@example.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -145,11 +141,12 @@ function LoginForm() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">{t("Password")}</Label>
                   <Input
                     id="password"
                     name="password"
                     type="password"
+                    dir="ltr"
                     placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
@@ -161,17 +158,17 @@ function LoginForm() {
                   />
                 </div>
                 {error && (
-                  <p className="rounded-md bg-rose-50 border border-rose-200 p-2.5 text-sm text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300">
-                    {error}
+                  <p role="alert" className="rounded-md bg-rose-50 border border-rose-200 p-2.5 text-sm text-rose-700 dark:bg-rose-950/40 dark:border-rose-800 dark:text-rose-300">
+                    {t(error)}
                   </p>
                 )}
                 <Button type="submit" className="w-full bg-gradient-to-r from-teal-700 to-emerald-600 hover:from-teal-800 hover:to-emerald-700 text-white font-semibold" disabled={submitting}>
                   {submitting ? (
                     <Spinner size={18} />
                   ) : mode === "login" ? (
-                    "Sign in"
+                    t("Sign in")
                   ) : (
-                    "Create account"
+                    t("Create account")
                   )}
                 </Button>
               </form>
@@ -183,15 +180,14 @@ function LoginForm() {
                   onClick={() => setMode(mode === "login" ? "signup" : "login")}
                 >
                   {mode === "login"
-                    ? "Don't have an account? Sign up"
-                    : "Already have an account? Sign in"}
+                    ? t("Don't have an account? Sign up")
+                    : t("Already have an account? Sign in")}
                 </button>
               </div>
             </CardContent>
           </Card>
           <p className="mt-8 text-center text-[10px] text-slate-400 dark:text-slate-500">
-            A thoughtful workspace for your documents and ideas.
-          </p>
+            {t("Tools for reading documents and extracting data.")}</p>
         </div>
       </div>
     </div>

@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/components/providers/language-provider";
 
 import { useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -13,6 +14,7 @@ export function MessageBubble({
   message: Message;
   isStreaming?: boolean;
 }) {
+  const { t } = useLanguage();
   const assistant = message.role === "assistant";
   const [copied, setCopied] = useState(false);
 
@@ -27,7 +29,7 @@ export function MessageBubble({
   return (
     <article
       className={`flex gap-3 py-3 ${assistant ? "" : "justify-end"}`}
-      aria-label={assistant ? "Assistant response" : "Your message"}
+      aria-label={assistant ? t("Assistant response") : t("Your message")}
     >
       {assistant && (
         <span className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-teal-700 to-emerald-600 text-white shadow-2xs">
@@ -50,8 +52,7 @@ export function MessageBubble({
             {isStreaming && (
               <span className="flex items-center gap-1 text-[11px] text-emerald-700 dark:text-emerald-400 animate-pulse font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Thinking…
-              </span>
+                {t("Thinking…")}</span>
             )}
           </div>
         )}
@@ -66,8 +67,8 @@ export function MessageBubble({
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {message.content ||
                 (isStreaming
-                  ? "Analyzing document with Luna…"
-                  : "No response was received.")}
+                  ? t("Analyzing document with Luna…")
+                  : t("No response was received."))}
             </ReactMarkdown>
           ) : (
             message.content
@@ -78,10 +79,10 @@ export function MessageBubble({
             <button
               onClick={copy}
               className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-medium text-slate-500 hover:text-slate-800 hover:bg-slate-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-800 transition shadow-2xs"
-              aria-label="Copy response"
+              aria-label={t("Copy response")}
             >
               {copied ? <Check size={12} className="text-emerald-600 dark:text-emerald-400" /> : <Copy size={12} />}
-              <span>{copied ? "Copied" : "Copy"}</span>
+              <span>{copied ? t("Copied") : t("Copy")}</span>
             </button>
           </div>
         )}

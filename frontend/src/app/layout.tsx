@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SessionProvider } from "@/components/providers/session-provider";
+import { LanguageProvider } from "@/components/providers/language-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 
 const geistSans = Geist({
@@ -14,9 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DOCTool — Your documents. A world of answers.",
+  title: "DOCTool — Document chat, OCR and data extraction",
   description:
-    "A knowledge workspace for PDF, Word, and Excel. Ask questions, research with document agents, and turn your files into insights.",
+    "Upload documents, ask questions with source references, extract data, and translate between Arabic and English.",
 };
 
 const themeInitScript = `
@@ -24,6 +25,9 @@ const themeInitScript = `
     try {
       var stored = localStorage.getItem('doctool-theme');
       var root = document.documentElement;
+      var language = localStorage.getItem('doctool-language') === 'ar' ? 'ar' : 'en';
+      root.lang = language;
+      root.dir = language === 'ar' ? 'rtl' : 'ltr';
       if (stored === 'dark' || (!stored && window.matchMedia('(prefers-color-scheme: dark)').matches && stored !== 'light')) {
         root.classList.add('dark');
         root.setAttribute('data-theme', 'dark');
@@ -51,7 +55,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} h-full antialiased bg-white text-slate-900 dark:bg-[#090d12] dark:text-slate-100 transition-colors duration-150`}
       >
         <ThemeProvider>
-          <SessionProvider>{children}</SessionProvider>
+          <LanguageProvider><SessionProvider>{children}</SessionProvider></LanguageProvider>
         </ThemeProvider>
       </body>
     </html>

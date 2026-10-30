@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/components/providers/language-provider";
 import { use, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
@@ -14,6 +15,7 @@ import {
   ApiError,
 } from "@/lib/api";
 import type { ChatMode, Message } from "@/lib/types";
+import { serviceCatalog } from "@/lib/service-catalog";
 import { workflows } from "@/lib/workflows";
 import {
   ArrowLeft,
@@ -74,6 +76,11 @@ export default function ChatPage({
 }: {
   params: Promise<{ sessionId: string }>;
 }) {
+  const { t, language } = useLanguage();
+  const localizedServices = DOCUMENT_SERVICES.map((service) => {
+    const copy = serviceCatalog.find((entry) => entry.id === service.id);
+    return { ...service, name: copy?.title[language] || service.name, desc: copy?.description[language] || service.desc };
+  });
   const { sessionId } = use(params);
   const search = useSearchParams();
   const initialWorkflow = workflows.find(
@@ -251,8 +258,7 @@ export default function ChatPage({
           {error || "Conversation unavailable."}
         </p>
         <Link href="/conversations" className="mt-5 inline-block text-sm text-teal-700">
-          Return to conversations
-        </Link>
+          {t("Return to conversations")}</Link>
       </div>
     );
   const unit = /\.pdf$/i.test(session.document.originalFilename)
@@ -264,13 +270,13 @@ export default function ChatPage({
         <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/conversations"
-            aria-label="Back to conversations"
+            aria-label={t("Back to conversations")}
             className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500"
           >
             <ArrowLeft size={17} />
           </Link>
           <div className="min-w-0">
-            <p className="eyebrow mb-0.5">Workspace / Conversations</p>
+            <p className="eyebrow mb-0.5">{t("Workspace / Conversations")}</p>
             <h1 className="max-w-[60vw] truncate text-base font-semibold tracking-tight lg:max-w-xl">
               {session.title}
             </h1>
@@ -279,11 +285,11 @@ export default function ChatPage({
         <div className="flex items-center gap-2">
           <Link
             href="/usage"
-            title="Chat consumes 1 credit per response"
+            title={t("Chat consumes 1 credit per response")}
             className="hidden sm:inline-flex items-center gap-1.5 rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
           >
             <Zap size={12} className="text-teal-600 fill-teal-600" />
-            <span>1 Credit / Response</span>
+            <span>{t("1 Credit / Response")}</span>
           </Link>
           <Button
             variant="outline"
@@ -292,8 +298,7 @@ export default function ChatPage({
             disabled={!messages.length || streaming}
             className="gap-2 !border-slate-200 bg-white text-xs"
           >
-            <Download size={14} /> Export
-          </Button>
+            <Download size={14} /> {t("Export")}</Button>
           <Button
             variant="outline"
             size="sm"
@@ -301,8 +306,7 @@ export default function ChatPage({
             aria-expanded={sourceOpen}
             className="gap-2 !border-slate-200 bg-white text-xs"
           >
-            <BookOpen size={14} /> Source
-          </Button>
+            <BookOpen size={14} /> {t("Source")}</Button>
         </div>
       </header>
       <div
@@ -311,9 +315,7 @@ export default function ChatPage({
         <section className="surface flex min-w-0 flex-1 flex-col overflow-hidden h-full">
           <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-100 dark:border-slate-800 px-4 py-2 bg-white dark:bg-[#121820]">
             <div className="mr-auto flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> Grounded
-              in your document
-            </div>
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" /> {t("Grounded in your document")}</div>
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -321,34 +323,33 @@ export default function ChatPage({
                 className="inline-flex items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition shadow-2xs"
               >
                 <Layers size={13} className="text-emerald-600 dark:text-emerald-400" />
-                <span>Services (19)</span>
+                <span>{t("Services (19)")}</span>
               </button>
               <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-1 text-[10px] font-semibold text-slate-600 dark:text-slate-300">
                 <Zap size={11} className="text-emerald-600 fill-emerald-600 dark:text-emerald-400 dark:fill-emerald-400" />
-                {getServiceCost(mode)}c / call
-              </span>
+                {getServiceCost(mode)}{t("c / call")}</span>
               <select
-                aria-label="Assistant mode"
+                aria-label={t("Assistant mode")}
                 disabled={streaming}
                 value={mode}
                 onChange={(e) => setMode(e.target.value as ChatMode)}
                 className="rounded-md border border-slate-200 bg-white p-1 text-[11px] dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
               >
-                <option value="conversational">Document chat</option>
-                <option value="agent">Research agent</option>
-                <option value="summary">Summary agent</option>
-                <option value="research">Deep research</option>
-                <option value="extraction">Data extraction</option>
-                <option value="comparison">Comparison</option>
-                <option value="factcheck">Fact-check</option>
-                <option value="invoice">Invoice processing</option>
-                <option value="receipt">Receipt & Expenses</option>
-                <option value="contract">Contract analysis</option>
-                <option value="resume">Resume & Talent</option>
-                <option value="compliance">PII & Compliance</option>
-                <option value="form_parser">Form Parser</option>
-                <option value="google_ai">Google AI Document</option>
-                <option value="coordinator">Auto-routing</option>
+                <option value="conversational">{t("Document chat")}</option>
+                <option value="agent">{t("Research agent")}</option>
+                <option value="summary">{t("Summary agent")}</option>
+                <option value="research">{t("Deep research")}</option>
+                <option value="extraction">{t("Data extraction")}</option>
+                <option value="comparison">{t("Comparison")}</option>
+                <option value="factcheck">{t("Fact-check")}</option>
+                <option value="invoice">{t("Invoice processing")}</option>
+                <option value="receipt">{t("Receipt & Expenses")}</option>
+                <option value="contract">{t("Contract analysis")}</option>
+                <option value="resume">{t("Resume & Talent")}</option>
+                <option value="compliance">{t("PII & Compliance")}</option>
+                <option value="form_parser">{t("Form Parser")}</option>
+                <option value="google_ai">{t("Google AI Document")}</option>
+                <option value="coordinator">{t("Auto-routing")}</option>
               </select>
             </div>
           </div>
@@ -372,12 +373,9 @@ export default function ChatPage({
                   <Sparkles size={29} />
                 </span>
                 <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                  What would you like to discover?
-                </h2>
+                  {t("What would you like to know about this document?")}</h2>
                 <p className="mt-3 text-sm leading-7 text-slate-500 dark:text-slate-400">
-                  Ask about {session.document.originalFilename}, or start with a
-                  little inspiration.
-                </p>
+                  {t("Ask about")}{session.document.originalFilename}{t(", or choose a task below.")}</p>
                 <div className="mt-7 grid gap-3 sm:grid-cols-2">
                   {workflows.map((w) => (
                     <button
@@ -410,16 +408,14 @@ export default function ChatPage({
                     href="/usage"
                     className="ml-3 shrink-0 rounded bg-rose-600 px-2 py-0.5 text-[11px] font-medium text-white hover:bg-rose-700 transition"
                   >
-                    View API & Credits
-                  </Link>
+                    {t("View API & Credits")}</Link>
                 )}
               </div>
             )}
             {/* Quick Action Service Pills */}
             <div className="mb-2 flex items-center gap-1.5 overflow-x-auto pb-1 text-[11px] scrollbar-none">
               <span className="shrink-0 text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                Services:
-              </span>
+                {t("Services:")}</span>
               <button
                 type="button"
                 disabled={streaming}
@@ -429,8 +425,7 @@ export default function ChatPage({
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50 transition shadow-2xs disabled:opacity-50"
               >
-                <Zap size={11} className="text-teal-600 fill-teal-600" /> Invoice (25c)
-              </button>
+                <Zap size={11} className="text-teal-600 fill-teal-600" /> {t("Invoice (25c)")}</button>
               <button
                 type="button"
                 disabled={streaming}
@@ -440,8 +435,7 @@ export default function ChatPage({
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50 transition shadow-2xs disabled:opacity-50"
               >
-                <Zap size={11} className="text-teal-600 fill-teal-600" /> Summary (10c)
-              </button>
+                <Zap size={11} className="text-teal-600 fill-teal-600" /> {t("Summary (10c)")}</button>
               <button
                 type="button"
                 disabled={streaming}
@@ -451,8 +445,7 @@ export default function ChatPage({
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50 transition shadow-2xs disabled:opacity-50"
               >
-                <Zap size={11} className="text-teal-600 fill-teal-600" /> Contract (35c)
-              </button>
+                <Zap size={11} className="text-teal-600 fill-teal-600" /> {t("Contract (35c)")}</button>
               <button
                 type="button"
                 disabled={streaming}
@@ -462,8 +455,7 @@ export default function ChatPage({
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-1 text-slate-700 hover:border-teal-500 hover:text-teal-800 hover:bg-teal-50/50 transition shadow-2xs disabled:opacity-50"
               >
-                <Zap size={11} className="text-teal-600 fill-teal-600" /> Compliance (30c)
-              </button>
+                <Zap size={11} className="text-teal-600 fill-teal-600" /> {t("Compliance (30c)")}</button>
               <button
                 type="button"
                 disabled={streaming}
@@ -472,16 +464,14 @@ export default function ChatPage({
                 }}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50/80 px-2.5 py-1 text-teal-800 hover:bg-teal-100 transition shadow-2xs disabled:opacity-50 font-medium"
               >
-                <Info size={11} className="text-teal-600" /> Explain Services (1c)
-              </button>
+                <Info size={11} className="text-teal-600" /> {t("Explain Services (1c)")}</button>
               <button
                 type="button"
                 disabled={streaming}
                 onClick={() => setServiceModalOpen(true)}
                 className="shrink-0 inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-600 hover:bg-slate-100 transition shadow-2xs font-medium"
               >
-                <Layers size={11} /> All 19 Services →
-              </button>
+                <Layers size={11} /> {t("All 19 Services →")}</button>
             </div>
             <ChatInput
               key={draftKey}
@@ -512,24 +502,24 @@ export default function ChatPage({
               </span>
               <span className="hidden shrink-0 sm:block">
                 {mode === "agent"
-                  ? "Research agent"
+                  ? t("Research agent")
                   : mode === "summary"
-                    ? "Summary agent"
+                    ? t("Summary agent")
                     : mode === "research"
-                      ? "Deep research"
+                      ? t("Deep research")
                       : mode === "extraction"
-                        ? "Data extraction"
+                        ? t("Data extraction")
                         : mode === "comparison"
-                          ? "Comparison"
+                          ? t("Comparison")
                           : mode === "factcheck"
-                            ? "Fact-check"
+                            ? t("Fact-check")
                             : mode === "invoice"
-                              ? "Invoice processing"
+                              ? t("Invoice processing")
                               : mode === "contract"
-                                ? "Contract analysis"
+                                ? t("Contract analysis")
                                 : mode === "coordinator"
-                                  ? "Auto-routing"
-                                  : "Document chat"}
+                                  ? t("Auto-routing")
+                                  : t("Document chat")}
               </span>
             </div>
           </div>
@@ -540,14 +530,12 @@ export default function ChatPage({
               <div className="flex items-center justify-between mb-2">
                 <h2 className="flex items-center gap-1.5 text-xs font-semibold">
                   <Settings2 size={14} className="text-slate-400" />
-                  Conversation settings
-                </h2>
+                  {t("Conversation settings")}</h2>
               </div>
               <div className="grid grid-cols-2 gap-2 text-[10px]">
                 <div>
                   <label htmlFor="model" className="mb-1 block text-slate-500">
-                    Model
-                  </label>
+                    {t("Model")}</label>
                   <select
                     id="model"
                     disabled={streaming || !models.length}
@@ -558,14 +546,13 @@ export default function ChatPage({
                     {models.length ? (
                       models.map((m) => <option key={m}>{m}</option>)
                     ) : (
-                      <option value="">Server default</option>
+                      <option value="">{t("Server default")}</option>
                     )}
                   </select>
                 </div>
                 <div>
                   <label htmlFor="style" className="mb-1 block text-slate-500">
-                    Length
-                  </label>
+                    {t("Length")}</label>
                   <select
                     id="style"
                     disabled={streaming}
@@ -573,9 +560,9 @@ export default function ChatPage({
                     onChange={(e) => setStyle(e.target.value)}
                     className="w-full rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs"
                   >
-                    <option value="concise">Concise</option>
-                    <option value="balanced">Balanced</option>
-                    <option value="detailed">Detailed</option>
+                    <option value="concise">{t("Concise")}</option>
+                    <option value="balanced">{t("Balanced")}</option>
+                    <option value="detailed">{t("Detailed")}</option>
                   </select>
                 </div>
               </div>
@@ -583,10 +570,9 @@ export default function ChatPage({
             <section className="surface flex flex-1 min-h-0 flex-col overflow-hidden p-3.5">
               <div className="flex shrink-0 items-center justify-between">
                 <h2 className="flex items-center gap-1.5 text-xs font-semibold">
-                  <BookOpen size={14} className="text-slate-400" /> Source reader
-                </h2>
+                  <BookOpen size={14} className="text-slate-400" /> {t("Source reader")}</h2>
                 <button
-                  aria-label="Close source reader"
+                  aria-label={t("Close source reader")}
                   onClick={() => setSourceOpen(false)}
                   className="text-slate-400 hover:text-slate-600 transition"
                 >
@@ -604,7 +590,7 @@ export default function ChatPage({
               </div>
               <div className="flex shrink-0 items-center justify-between border-b border-slate-100 pb-2">
                 <button
-                  aria-label="Previous section"
+                  aria-label={t("Previous section")}
                   disabled={page <= 1 || sourceLoading}
                   onClick={() => setPage((p) => p - 1)}
                   className="rounded p-1 text-slate-500 disabled:opacity-25"
@@ -612,10 +598,10 @@ export default function ChatPage({
                   <ChevronLeft size={14} />
                 </button>
                 <span className="text-[10px] capitalize text-slate-500">
-                  {unit} {page} of {session.document.pageCount}
+                  {unit} {page} {t("of")}{session.document.pageCount}
                 </span>
                 <button
-                  aria-label="Next section"
+                  aria-label={t("Next section")}
                   disabled={page >= session.document.pageCount || sourceLoading}
                   onClick={() => setPage((p) => p + 1)}
                   className="rounded p-1 text-slate-500 disabled:opacity-25"
@@ -642,7 +628,7 @@ export default function ChatPage({
                 }}
                 className="mt-2 shrink-0 flex items-center justify-between border-t border-slate-100 pt-2 text-[10px] font-medium text-teal-700 disabled:opacity-40"
               >
-                Ask about this {unit}
+                {t("Ask about this")}{unit}
                 <ArrowUpRight size={13} />
               </button>
             </section>
@@ -658,17 +644,16 @@ export default function ChatPage({
               <div>
                 <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
                   <Sparkles size={18} className="text-teal-600" />
-                  Document AI Services Catalog
-                </h2>
+                  {t("Document AI Services Catalog")}</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Powered by Luna (gpt-6-luna). 19 enterprise extraction, compliance, and multi-agent services.
+                  {t("Choose a task to run on this document. Review the credit cost before running it.", "اختر مهمة لتشغيلها على هذا المستند. راجع تكلفة الرصيد قبل التشغيل.")}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setServiceModalOpen(false)}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
-                aria-label="Close service catalog"
+                aria-label={t("Close service catalog")}
               >
                 <X size={18} />
               </button>
@@ -679,7 +664,7 @@ export default function ChatPage({
                 <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
-                  placeholder="Search 19 services..."
+                  placeholder={t("Search 19 services...")}
                   value={serviceSearch}
                   onChange={(e) => setServiceSearch(e.target.value)}
                   className="w-full rounded-lg border border-slate-200 bg-white py-1.5 pl-9 pr-3 text-xs text-slate-800 placeholder:text-slate-400 focus:border-teal-500 focus:outline-hidden"
@@ -705,12 +690,13 @@ export default function ChatPage({
 
             <div className="flex-1 overflow-y-auto p-6">
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {DOCUMENT_SERVICES.filter((svc) => {
+                {localizedServices.filter((svc) => {
                   const matchesCat = serviceCategory === "All" || svc.category === serviceCategory;
                   const matchesQuery =
                     !serviceSearch.trim() ||
                     svc.name.toLowerCase().includes(serviceSearch.toLowerCase()) ||
-                    svc.desc.toLowerCase().includes(serviceSearch.toLowerCase());
+                    svc.desc.toLowerCase().includes(serviceSearch.toLowerCase()) ||
+                    serviceCatalog.some((entry) => entry.id === svc.id && `${entry.title.en} ${entry.title.ar}`.toLowerCase().includes(serviceSearch.toLowerCase()));
                   return matchesCat && matchesQuery;
                 }).map((svc) => (
                   <div
@@ -744,8 +730,7 @@ export default function ChatPage({
                         className="inline-flex flex-1 items-center justify-center gap-1 rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-teal-700 transition disabled:opacity-50"
                       >
                         <Zap size={12} className="fill-white" />
-                        Run
-                      </button>
+                        {t("Run")}</button>
                       <button
                         type="button"
                         disabled={streaming}
@@ -758,8 +743,7 @@ export default function ChatPage({
                         className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
                       >
                         <Info size={12} className="text-teal-600" />
-                        Explain
-                      </button>
+                        {t("Explain")}</button>
                     </div>
                   </div>
                 ))}
@@ -767,14 +751,13 @@ export default function ChatPage({
             </div>
 
             <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50 px-6 py-3 text-xs text-slate-500">
-              <span>Enterprise Document AI Powered by Luna</span>
+              <span>{t("Document processing tools", "أدوات معالجة المستندات")}</span>
               <button
                 type="button"
                 onClick={() => setServiceModalOpen(false)}
                 className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
               >
-                Close
-              </button>
+                {t("Close")}</button>
             </div>
           </div>
         </div>

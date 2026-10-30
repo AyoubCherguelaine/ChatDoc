@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/components/providers/language-provider";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -26,21 +27,23 @@ import { Brand } from "@/components/brand";
 import { useSession } from "@/components/providers/session-provider";
 import { fetchCompanyAccount, type CompanyAccountInfo } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { LanguageToggle } from "@/components/ui/language-toggle";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 
-function getPageTitle(pathname: string): string {
-  if (pathname.startsWith("/overview")) return "Platform Overview";
-  if (pathname.startsWith("/advanced-ocr")) return "Advanced OCR";
-  if (pathname.startsWith("/services")) return "AI Services";
-  if (pathname.startsWith("/docs")) return "Platform Documentation";
-  if (pathname.startsWith("/playground")) return "Playground Sandbox";
-  if (pathname.startsWith("/usage")) return "Credits & Usage Logs";
-  if (pathname.startsWith("/conversations")) return "Chats";
-  if (pathname.startsWith("/chat")) return "Document Chat";
-  return "Document AI";
+function getPageTitle(pathname: string, t: (value: string) => string): string {
+  if (pathname.startsWith("/overview")) return t("Platform Overview");
+  if (pathname.startsWith("/advanced-ocr")) return t("Advanced OCR");
+  if (pathname.startsWith("/services")) return t("AI Services");
+  if (pathname.startsWith("/docs")) return t("Platform Documentation");
+  if (pathname.startsWith("/playground")) return t("Playground Sandbox");
+  if (pathname.startsWith("/usage")) return t("Credits & Usage Logs");
+  if (pathname.startsWith("/conversations")) return t("Chats");
+  if (pathname.startsWith("/chat")) return t("Document Chat");
+  return t("Document AI");
 }
 
 export function Navbar() {
+  const { t } = useLanguage();
   const { user, logout } = useSession();
   const pathname = usePathname();
 
@@ -81,25 +84,26 @@ export function Navbar() {
   const mainNavLinks = [
     {
       href: "/overview",
-      label: "Overview",
+      label: t("Overview"),
       icon: LayoutDashboard,
       isActive: (p: string) => p.startsWith("/overview"),
     },
     {
       href: "/conversations",
-      label: "Chats",
+      label: t("Chats"),
       icon: MessageSquare,
-      isActive: (p: string) => p.startsWith("/conversations") || p.startsWith("/chat"),
+      isActive: (p: string) =>
+        p.startsWith("/conversations") || p.startsWith("/chat"),
     },
     {
       href: "/advanced-ocr",
-      label: "Advanced OCR",
+      label: t("Advanced OCR"),
       icon: ScanText,
       isActive: (p: string) => p.startsWith("/advanced-ocr"),
     },
     {
       href: "/services",
-      label: "AI Services",
+      label: t("AI Services"),
       icon: Bot,
       isActive: (p: string) => p.startsWith("/services"),
     },
@@ -108,7 +112,9 @@ export function Navbar() {
   const copyApiKey = async () => {
     if (!account?.apiKeyPrefix) return;
     try {
-      await navigator.clipboard.writeText(`${account.apiKeyPrefix}********************`);
+      await navigator.clipboard.writeText(
+        `${account.apiKeyPrefix}********************`,
+      );
       setCopiedKey(true);
       setTimeout(() => setCopiedKey(false), 2000);
     } catch {}
@@ -116,7 +122,7 @@ export function Navbar() {
 
   const remaining = account?.remainingCredits ?? 1200;
   const initial = user?.name?.[0]?.toUpperCase() || "U";
-  const pageTitle = getPageTitle(pathname);
+  const pageTitle = getPageTitle(pathname, t);
 
   return (
     <>
@@ -128,7 +134,9 @@ export function Navbar() {
         {/* Left: Mobile Toggle + Breadcrumb / Operation Title */}
         <div className="flex items-center gap-3">
           <button
-            aria-label="Toggle operations sidebar"
+            aria-label={t("Toggle operations sidebar")}
+            aria-expanded={sidebarOpen}
+            aria-controls="workspace-navigation"
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800 lg:hidden"
           >
@@ -136,12 +144,16 @@ export function Navbar() {
           </button>
 
           <div className="hidden sm:flex items-center gap-2 text-xs">
-            <span className="font-semibold text-slate-400 dark:text-slate-500">DOCTool</span>
+            <span className="font-semibold text-slate-400 dark:text-slate-500">
+              DOCTool
+            </span>
             <span className="text-slate-300 dark:text-slate-700">/</span>
-            <span className="font-bold text-slate-800 dark:text-slate-200">{pageTitle}</span>
+            <span className="font-bold text-slate-800 dark:text-slate-200">
+              {pageTitle}
+            </span>
           </div>
 
-          <div className="sm:hidden">
+          <div className="hidden min-[480px]:block sm:hidden">
             <Brand href="/overview" />
           </div>
         </div>
@@ -149,38 +161,47 @@ export function Navbar() {
         {/* Right: Theme Toggle + Small Credit Pill + Profile */}
         <div className="flex items-center gap-2.5 sm:gap-3">
           {/* THEME TOGGLE (WHITE/GREEN <-> MODERN DARK) */}
+          <LanguageToggle />
           <ThemeToggle />
 
           {/* SMALL CREDIT PILL */}
           <Link
             href="/usage"
-            title="View remaining credit quota and usage logs"
-            className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
+            title={t("View remaining credit quota and usage logs")}
+            className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition shadow-2xs dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50"
           >
-            <Zap size={12} className="text-emerald-600 fill-emerald-600 dark:text-emerald-400 dark:fill-emerald-400" />
+            <Zap
+              size={12}
+              className="text-emerald-600 fill-emerald-600 dark:text-emerald-400 dark:fill-emerald-400"
+            />
             <span>{remaining.toLocaleString()}</span>
-            <span className="hidden sm:inline text-[11px] font-normal text-emerald-700 dark:text-emerald-400">Credits</span>
+            <span className="hidden sm:inline text-[11px] font-normal text-emerald-700 dark:text-emerald-400">
+              {t("Credits")}
+            </span>
           </Link>
 
           {/* PROFILE WITH SELECT GROUP (DROPDOWN) */}
           <div className="relative" ref={profileMenuRef}>
             <button
               onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pr-2.5 text-left transition hover:border-emerald-500 hover:shadow-2xs dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500"
-              aria-label="Profile and select group"
+              className="flex items-center gap-2 rounded-full border border-slate-200 bg-white p-1 pe-2.5 text-start transition hover:border-emerald-500 hover:shadow-2xs dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500"
+              aria-label={t("Profile and select group")}
             >
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-tr from-teal-700 to-emerald-600 text-xs font-bold text-white shadow-2xs">
                 {initial}
               </span>
               <span className="hidden md:inline max-w-[110px] truncate text-xs font-semibold text-slate-800 dark:text-slate-200">
-                {user?.name || "Account"}
+                {user?.name || t("Account")}
               </span>
-              <ChevronDown size={13} className="text-slate-400 dark:text-slate-500" />
+              <ChevronDown
+                size={13}
+                className="text-slate-400 dark:text-slate-500"
+              />
             </button>
 
             {/* Profile Dropdown */}
             {profileDropdownOpen && (
-              <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-slate-800 dark:bg-[#121820]">
+              <div className="absolute end-0 top-11 z-50 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150 dark:border-slate-800 dark:bg-[#121820]">
                 {/* Profile Header */}
                 <div className="border-b border-slate-100 bg-slate-50/70 p-4 dark:border-slate-800 dark:bg-slate-900/50">
                   <div className="flex items-center gap-3">
@@ -188,8 +209,12 @@ export function Navbar() {
                       {initial}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">{user?.name}</p>
-                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">{user?.email}</p>
+                      <p className="truncate text-sm font-bold text-slate-900 dark:text-slate-100">
+                        {user?.name}
+                      </p>
+                      <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                        {user?.email}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -197,7 +222,7 @@ export function Navbar() {
                 {/* Workspace / Select Group */}
                 <div className="border-b border-slate-100 p-3 dark:border-slate-800">
                   <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2 px-1">
-                    Select Group / Workspace
+                    {t("Select Group / Workspace")}
                   </p>
                   <div className="space-y-1">
                     <button
@@ -210,10 +235,20 @@ export function Navbar() {
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <Building size={14} className="text-emerald-600 dark:text-emerald-400" />
-                        <span className="truncate">{account?.companyName || "Default Organization"}</span>
+                        <Building
+                          size={14}
+                          className="text-emerald-600 dark:text-emerald-400"
+                        />
+                        <span className="truncate">
+                          {account?.companyName || t("Default Organization")}
+                        </span>
                       </div>
-                      {selectedGroup === "main" && <Check size={14} className="text-emerald-600 dark:text-emerald-400" />}
+                      {selectedGroup === "main" && (
+                        <Check
+                          size={14}
+                          className="text-emerald-600 dark:text-emerald-400"
+                        />
+                      )}
                     </button>
 
                     <button
@@ -226,10 +261,18 @@ export function Navbar() {
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <Users size={14} className="text-slate-500 dark:text-slate-400" />
-                        <span>Personal Workspace</span>
+                        <Users
+                          size={14}
+                          className="text-slate-500 dark:text-slate-400"
+                        />
+                        <span>{t("Personal Workspace")}</span>
                       </div>
-                      {selectedGroup === "personal" && <Check size={14} className="text-emerald-600 dark:text-emerald-400" />}
+                      {selectedGroup === "personal" && (
+                        <Check
+                          size={14}
+                          className="text-emerald-600 dark:text-emerald-400"
+                        />
+                      )}
                     </button>
                   </div>
                 </div>
@@ -238,16 +281,21 @@ export function Navbar() {
                 <div className="border-b border-slate-100 p-3 bg-emerald-50/40 dark:border-slate-800 dark:bg-emerald-950/20">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                      <Zap size={13} className="text-emerald-600 fill-emerald-600 dark:text-emerald-400 dark:fill-emerald-400" />
-                      Available Balance
+                      <Zap
+                        size={13}
+                        className="text-emerald-600 fill-emerald-600 dark:text-emerald-400 dark:fill-emerald-400"
+                      />
+                      {t("Available Balance")}
                     </span>
                     <span className="text-[10px] font-bold uppercase rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
-                      {account?.planTier || "Free Trial"}
+                      {account?.planTier || t("Free Trial")}
                     </span>
                   </div>
                   <div className="text-xl font-extrabold text-slate-900 dark:text-white">
                     {remaining.toLocaleString()}{" "}
-                    <span className="text-xs font-normal text-slate-500 dark:text-slate-400">credits</span>
+                    <span className="text-xs font-normal text-slate-500 dark:text-slate-400">
+                      {t("credits")}
+                    </span>
                   </div>
                   <Link
                     href="/usage"
@@ -255,7 +303,7 @@ export function Navbar() {
                     className="mt-2 flex items-center justify-between rounded-lg bg-white border border-emerald-200 p-2 text-[11px] font-semibold text-emerald-800 hover:bg-emerald-50 transition dark:bg-slate-900 dark:border-emerald-800/50 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                   >
                     <span className="flex items-center gap-1">
-                      <History size={13} /> View Credit Usage Logs
+                      <History size={13} /> {t("View Credit Usage Logs")}
                     </span>
                     <span>→</span>
                   </Link>
@@ -264,20 +312,25 @@ export function Navbar() {
                 {/* API Key */}
                 <div className="border-b border-slate-100 p-3 space-y-2 dark:border-slate-800">
                   <div className="flex items-center justify-between text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    <span>Company API Key</span>
+                    <span>{t("Company API Key")}</span>
                     <button
                       onClick={copyApiKey}
                       className="text-[11px] text-emerald-700 dark:text-emerald-400 hover:underline flex items-center gap-1"
                     >
                       {copiedKey ? (
                         <>
-                          <Check size={11} className="text-emerald-600 dark:text-emerald-400" />
-                          <span className="text-emerald-600 dark:text-emerald-400">Copied</span>
+                          <Check
+                            size={11}
+                            className="text-emerald-600 dark:text-emerald-400"
+                          />
+                          <span className="text-emerald-600 dark:text-emerald-400">
+                            {t("Copied")}
+                          </span>
                         </>
                       ) : (
                         <>
                           <Copy size={11} />
-                          <span>Copy</span>
+                          <span>{t("Copy")}</span>
                         </>
                       )}
                     </button>
@@ -286,7 +339,10 @@ export function Navbar() {
                     {account?.apiKeyPrefix || "docu_live_"}••••••••••••••••
                   </div>
                   <p className="text-[10px] text-slate-400 dark:text-slate-500">
-                    Configured model: <span className="font-semibold text-slate-600 dark:text-slate-300 font-mono">Luna (gpt-6-luna)</span>
+                    {t("Configured model:")}{" "}
+                    <span className="font-semibold text-slate-600 dark:text-slate-300 font-mono">
+                      Luna (gpt-6-luna)
+                    </span>
                   </p>
                 </div>
 
@@ -301,7 +357,7 @@ export function Navbar() {
                     className="flex w-full items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30 transition"
                   >
                     <LogOut size={14} />
-                    <span>Log Out</span>
+                    <span>{t("Log Out")}</span>
                   </button>
                 </div>
               </div>
@@ -316,16 +372,17 @@ export function Navbar() {
       {/* Mobile Backdrop */}
       {sidebarOpen && (
         <button
-          aria-label="Close navigation"
+          aria-label={t("Close navigation")}
           className="fixed inset-0 z-40 bg-slate-950/40 backdrop-blur-xs lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       <aside
+        id="workspace-navigation"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-[244px] flex-col border-r border-slate-200 bg-white px-4 py-6 transition-transform lg:visible lg:translate-x-0 dark:border-slate-800 dark:bg-[#0c1017]",
-          sidebarOpen ? "visible translate-x-0" : "invisible -translate-x-full",
+          "fixed inset-y-0 start-0 z-50 w-[244px] flex-col overflow-y-auto border-e border-slate-200 bg-white px-4 py-6 dark:border-slate-800 dark:bg-[#0c1017]",
+          sidebarOpen ? "flex" : "hidden lg:flex",
         )}
       >
         {/* Brand Header */}
@@ -333,7 +390,7 @@ export function Navbar() {
           <Brand href="/overview" />
           <button
             className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 lg:hidden"
-            aria-label="Close navigation"
+            aria-label={t("Close navigation")}
             onClick={() => setSidebarOpen(false)}
           >
             <PanelLeftClose size={17} />
@@ -342,11 +399,11 @@ export function Navbar() {
 
         {/* Operations / Workspace Label */}
         <p className="eyebrow mb-2 px-3 text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-          Workspace
+          {t("Workspace")}
         </p>
 
         {/* Primary Navigation Links */}
-        <nav aria-label="Main operations navigation" className="space-y-1">
+        <nav aria-label={t("Main operations navigation")} className="space-y-1">
           {mainNavLinks.map(({ href, label, icon: Icon, isActive }) => {
             const active = isActive(pathname);
             return (
@@ -356,10 +413,18 @@ export function Navbar() {
                 onClick={() => setSidebarOpen(false)}
                 className={cn(
                   "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200",
-                  active && "bg-emerald-50 text-[#087f74] dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold",
+                  active &&
+                    "bg-emerald-50 text-[#087f74] dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold",
                 )}
               >
-                <Icon size={17} className={active ? "text-[#087f74] dark:text-emerald-400" : "text-slate-400 dark:text-slate-500"} />
+                <Icon
+                  size={17}
+                  className={
+                    active
+                      ? "text-[#087f74] dark:text-emerald-400"
+                      : "text-slate-400 dark:text-slate-500"
+                  }
+                />
                 <span>{label}</span>
               </Link>
             );
@@ -369,20 +434,21 @@ export function Navbar() {
         {/* Secondary Developer & Quota Tools */}
         <div className="mt-5 pt-4 border-t border-slate-100 dark:border-slate-800">
           <p className="eyebrow mb-2 px-3 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
-            Developer & Quota
+            {t("Developer & Quota")}
           </p>
-          <nav aria-label="Developer navigation" className="space-y-1">
+          <nav aria-label={t("Developer navigation")} className="space-y-1">
             <Link
               href="/docs"
               onClick={() => setSidebarOpen(false)}
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200",
-                pathname.startsWith("/docs") && "bg-emerald-50 text-[#087f74] dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold",
+                pathname.startsWith("/docs") &&
+                  "bg-emerald-50 text-[#087f74] dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold",
               )}
             >
               <BookOpen size={16} />
-              <span>Platform Docs</span>
-              <span className="ml-auto rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <span>{t("Platform Docs")}</span>
+              <span className="ms-auto rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300">
                 DOCS
               </span>
             </Link>
@@ -391,12 +457,13 @@ export function Navbar() {
               onClick={() => setSidebarOpen(false)}
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200",
-                pathname.startsWith("/playground") && "bg-emerald-50 text-[#087f74] dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold",
+                pathname.startsWith("/playground") &&
+                  "bg-emerald-50 text-[#087f74] dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold",
               )}
             >
               <Code2 size={16} />
-              <span>Sandbox Demo</span>
-              <span className="ml-auto rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+              <span>{t("Sandbox Demo")}</span>
+              <span className="ms-auto rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[9px] font-mono font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
                 RUN
               </span>
             </Link>
@@ -405,12 +472,13 @@ export function Navbar() {
               onClick={() => setSidebarOpen(false)}
               className={cn(
                 "flex items-center gap-3 rounded-xl px-3 py-2 text-[12px] font-medium text-slate-600 transition-colors hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800/60 dark:hover:text-slate-200",
-                pathname.startsWith("/usage") && "bg-emerald-50 text-[#087f74] dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold",
+                pathname.startsWith("/usage") &&
+                  "bg-emerald-50 text-[#087f74] dark:bg-emerald-950/50 dark:text-emerald-400 font-semibold",
               )}
             >
               <Zap size={16} />
               <span>Credits & Usage</span>
-              <span className="ml-auto rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
+              <span className="ms-auto rounded bg-emerald-100 px-1.5 py-0.5 text-[9px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-300">
                 LOGS
               </span>
             </Link>
@@ -420,11 +488,17 @@ export function Navbar() {
         {/* Sidebar Footer Info */}
         <div className="mt-auto rounded-xl border border-slate-200 bg-slate-50/70 p-3.5 space-y-1 text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400">
           <div className="flex items-center gap-1.5 font-semibold text-slate-800 dark:text-slate-200">
-            <ShieldCheck size={14} className="text-emerald-600 dark:text-emerald-400" />
-            <span>Stateless Engine</span>
+            <ShieldCheck
+              size={14}
+              className="text-emerald-600 dark:text-emerald-400"
+            />
+            <span>{t("Document tools")}</span>
           </div>
           <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
-            Zero permanent storage. All PDFs are processed on the fly and deleted immediately.
+            {t(
+              "Upload a file, choose a task, and review the result.",
+              "ارفع ملفًا، واختر مهمة، ثم راجع النتيجة.",
+            )}
           </p>
         </div>
       </aside>

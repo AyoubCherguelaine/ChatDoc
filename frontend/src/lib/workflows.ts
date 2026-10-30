@@ -31,7 +31,7 @@ export const workflows: Workflow[] = [
   {
     id: "summary",
     title: "Executive summary",
-    description: "The big picture, without the long read.",
+    description: "Summarize the main findings, figures and recommendations.",
     prompt:
       "Write an executive summary of this document. Cover its purpose, key findings, important numbers, and recommended next steps. Cite the source page or section for each key finding.",
     mode: "summary",
@@ -40,7 +40,7 @@ export const workflows: Workflow[] = [
   {
     id: "research",
     title: "Deep research",
-    description: "Follow the evidence. Connect the details.",
+    description: "Review claims and supporting passages with source references.",
     prompt:
       "Investigate the main claims in this document. Search relevant sections, read the supporting pages, identify evidence and gaps, and produce a research brief with source citations. Clearly distinguish facts from inferences.",
     mode: "research",
@@ -49,7 +49,7 @@ export const workflows: Workflow[] = [
   {
     id: "extract",
     title: "Extract key data",
-    description: "Turn buried details into a clear table.",
+    description: "Extract names, dates and figures into a table.",
     prompt:
       "Extract the key metrics, dates, names, and financial figures from this document into a Markdown table. Include the source page or worksheet section for every row. Preserve units and currency, and mark missing values as not provided. Do not invent or calculate figures without showing the inputs.",
     mode: "extraction",
@@ -58,7 +58,7 @@ export const workflows: Workflow[] = [
   {
     id: "actions",
     title: "Find action items",
-    description: "Move from what it says to what comes next.",
+    description: "List stated tasks, owners and deadlines.",
     prompt:
       "Identify action items, decisions, deadlines, and responsible people explicitly mentioned in this document. Present them in a table with source citations. If an owner or deadline is absent, say not specified. Separate suggested actions from explicit commitments.",
     mode: "conversational",
@@ -67,7 +67,7 @@ export const workflows: Workflow[] = [
   {
     id: "factcheck",
     title: "Fact-check claims",
-    description: "Verify what the document says is true.",
+    description: "Check whether the document supports its claims.",
     prompt:
       "Verify the key factual claims in this document against the evidence. For each claim, state whether it is SUPPORTED, CONTRADICTED, or UNDETERMINED, and cite the source page. If the document contains no evidence for a claim, say so.",
     mode: "factcheck",
@@ -103,7 +103,7 @@ export const workflows: Workflow[] = [
   {
     id: "google_ai",
     title: "Google AI Document",
-    description: "Multimodal document intelligence and structured entity extraction.",
+    description: "Extract document structure, fields and tables.",
     prompt:
       "Analyse this document using Google AI Document Intelligence. Perform layout and structural analysis, extract key entities, form fields, tables, and summarize the core information into structured sections with citations.",
     mode: "google_ai",
@@ -120,7 +120,7 @@ export const workflows: Workflow[] = [
   },
   {
     id: "resume",
-    title: "Resume & Talent Intelligence",
+    title: "Resume reading",
     description: "Candidate profiling, skills taxonomy, work history, and experience scoring.",
     prompt:
       "Parse this resume/CV: extract candidate contact info, executive summary, technical/soft skills taxonomy, chronological work history with key accomplishments, educational background, certifications, and provide a seniority assessment.",
@@ -138,7 +138,7 @@ export const workflows: Workflow[] = [
   },
   {
     id: "form_parser",
-    title: "Intelligent Form Parser",
+    title: "Form reading",
     description: "Extract form fields, checkbox states, selection groups, and signatures.",
     prompt:
       "Parse all form fields from this document: identify form title and metadata, extract key-value field pairs, check-box selection states ([X] or [ ]), and signature blocks (signatory name, signed status, date signed). Highlight any missing required fields.",

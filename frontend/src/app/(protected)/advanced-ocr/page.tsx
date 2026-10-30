@@ -1,4 +1,5 @@
 "use client";
+import { useLanguage } from "@/components/providers/language-provider";
 import { getUploadSizeError, UPLOAD_LIMIT_LABEL } from "@/lib/upload-limits";
 
 import { useState, useRef, useId } from "react";
@@ -18,7 +19,6 @@ import {
   AlignLeft,
   AlertCircle,
   Link as LinkIcon,
-  Table as TableIcon,
   FileCheck2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,7 +30,13 @@ import {
 } from "@/lib/api";
 
 type ViewMode = "blocks" | "text" | "json";
-type BlockTypeFilter = "all" | "paragraph" | "title" | "table" | "formula" | "image";
+type BlockTypeFilter =
+  | "all"
+  | "paragraph"
+  | "title"
+  | "table"
+  | "formula"
+  | "image";
 
 function formatBytes(bytes: number, decimals = 1): string {
   if (bytes === 0) return "0 Bytes";
@@ -49,19 +55,28 @@ function getBlockBadgeStyle(type: string) {
   if (normalized.includes("table")) {
     return "bg-blue-50 text-blue-700 border-blue-200";
   }
-  if (normalized.includes("formula") || normalized.includes("equation") || normalized.includes("math")) {
+  if (
+    normalized.includes("formula") ||
+    normalized.includes("equation") ||
+    normalized.includes("math")
+  ) {
     return "bg-amber-50 text-amber-700 border-amber-200";
   }
-  if (normalized.includes("image") || normalized.includes("figure") || normalized.includes("visual")) {
+  if (
+    normalized.includes("image") ||
+    normalized.includes("figure") ||
+    normalized.includes("visual")
+  ) {
     return "bg-emerald-50 text-emerald-700 border-emerald-200";
   }
   if (normalized.includes("question")) {
     return "bg-indigo-50 text-indigo-700 border-indigo-200";
   }
-  return "bg-slate-100 text-slate-700 border-slate-200";
+  return "bg-slate-100 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
 }
 
 export default function AdvancedOcrPage() {
+  const { t } = useLanguage();
   const fileInputId = useId();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -69,7 +84,9 @@ export default function AdvancedOcrPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [startPage, setStartPage] = useState(1);
   const [endPage, setEndPage] = useState<number | "">("");
-  const [language, setLanguage] = useState<"auto" | "ar" | "en" | "mixed">("auto");
+  const [language, setLanguage] = useState<"auto" | "ar" | "en" | "mixed">(
+    "auto",
+  );
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -81,12 +98,19 @@ export default function AdvancedOcrPage() {
   const [copied, setCopied] = useState(false);
 
   const fieldClass =
-    "mt-2 w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-900 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 disabled:opacity-50 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-emerald-500";
+    "mt-2 w-full rounded-xl border border-slate-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-sm text-slate-900 dark:text-slate-100 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600 disabled:opacity-50 dark:focus:border-emerald-500";
 
   function handleFileSelection(candidate: File | null) {
     if (!candidate) return;
-    if (!candidate.name.toLowerCase().endsWith(".pdf") && candidate.type !== "application/pdf") {
-      setError("Please select a valid PDF file. Other file formats are not supported for PDF OCR.");
+    if (
+      !candidate.name.toLowerCase().endsWith(".pdf") &&
+      candidate.type !== "application/pdf"
+    ) {
+      setError(
+        t(
+          "Please select a valid PDF file. Other file formats are not supported for PDF OCR.",
+        ),
+      );
       return;
     }
     const sizeError = getUploadSizeError(candidate);
@@ -121,19 +145,19 @@ export default function AdvancedOcrPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!file) {
-      setError("Please upload a PDF file to run OCR extraction.");
+      setError(t("Please upload a PDF file to run OCR extraction."));
       return;
     }
     if (startPage < 1 || startPage > 3) {
-      setError("Start page must be between 1 and 3.");
+      setError(t("Start page must be between 1 and 3."));
       return;
     }
     if (typeof endPage === "number" && endPage < startPage) {
-      setError("End page must be greater than or equal to start page.");
+      setError(t("End page must be greater than or equal to start page."));
       return;
     }
     if (typeof endPage === "number" && endPage > 3) {
-      setError("Documents are limited to 3 pages.");
+      setError(t("Documents are limited to 3 pages."));
       return;
     }
 
@@ -150,7 +174,11 @@ export default function AdvancedOcrPage() {
       });
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "OCR extraction failed. Please try again.");
+      setError(
+        err instanceof Error
+          ? err.message
+          : t("OCR extraction failed. Please try again."),
+      );
     } finally {
       setBusy(false);
     }
@@ -158,8 +186,13 @@ export default function AdvancedOcrPage() {
 
   function downloadJson() {
     if (!result) return;
-    const baseName = (result.filename || file?.name || "document").replace(/\.pdf$/i, "");
-    const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+    const baseName = (result.filename || file?.name || "document").replace(
+      /\.pdf$/i,
+      "",
+    );
+    const blob = new Blob([JSON.stringify(result, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -170,7 +203,10 @@ export default function AdvancedOcrPage() {
 
   function downloadMarkdown() {
     if (!result) return;
-    const baseName = (result.filename || file?.name || "document").replace(/\.pdf$/i, "");
+    const baseName = (result.filename || file?.name || "document").replace(
+      /\.pdf$/i,
+      "",
+    );
 
     let md = `# OCR Document Extraction: ${result.filename || file?.name}\n\n`;
     md += `> **Processed Pages:** ${result.processed_pages} | **Total Blocks:** ${result.block_count}\n\n---\n\n`;
@@ -178,7 +214,9 @@ export default function AdvancedOcrPage() {
     for (const page of result.pages) {
       md += `## Page ${page.page_number} (${page.block_count} blocks)\n\n`;
       for (const b of page.blocks) {
-        const cont = b.previous_block_id ? ` *(Continues ${b.previous_block_id})*` : "";
+        const cont = b.previous_block_id
+          ? ` *(Continues ${b.previous_block_id})*`
+          : "";
         md += `### [${b.type.toUpperCase()}] ${b.id}${cont}\n\n`;
         if (typeof b.content === "string") {
           md += `${b.content}\n\n`;
@@ -210,8 +248,10 @@ export default function AdvancedOcrPage() {
           p.blocks.map(
             (b) =>
               b.ocr_text ||
-              (typeof b.content === "string" ? b.content : JSON.stringify(b.content))
-          )
+              (typeof b.content === "string"
+                ? b.content
+                : JSON.stringify(b.content)),
+          ),
         )
         .join("\n\n");
     }
@@ -224,16 +264,43 @@ export default function AdvancedOcrPage() {
   function filterBlock(block: SemanticOcrBlock): boolean {
     if (blockFilter !== "all") {
       const type = (block.type || "").toLowerCase();
-      if (blockFilter === "title" && !type.includes("title") && !type.includes("header")) return false;
+      if (
+        blockFilter === "title" &&
+        !type.includes("title") &&
+        !type.includes("header")
+      )
+        return false;
       if (blockFilter === "table" && !type.includes("table")) return false;
-      if (blockFilter === "formula" && !type.includes("formula") && !type.includes("equation") && !type.includes("math")) return false;
-      if (blockFilter === "image" && !type.includes("image") && !type.includes("visual") && !type.includes("figure")) return false;
-      if (blockFilter === "paragraph" && (type.includes("table") || type.includes("title") || type.includes("image") || type.includes("formula"))) return false;
+      if (
+        blockFilter === "formula" &&
+        !type.includes("formula") &&
+        !type.includes("equation") &&
+        !type.includes("math")
+      )
+        return false;
+      if (
+        blockFilter === "image" &&
+        !type.includes("image") &&
+        !type.includes("visual") &&
+        !type.includes("figure")
+      )
+        return false;
+      if (
+        blockFilter === "paragraph" &&
+        (type.includes("table") ||
+          type.includes("title") ||
+          type.includes("image") ||
+          type.includes("formula"))
+      )
+        return false;
     }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      const contentStr = typeof block.content === "string" ? block.content : JSON.stringify(block.content);
+      const contentStr =
+        typeof block.content === "string"
+          ? block.content
+          : JSON.stringify(block.content);
       const textMatch = (block.ocr_text || "").toLowerCase().includes(query);
       const contentMatch = contentStr.toLowerCase().includes(query);
       const idMatch = block.id.toLowerCase().includes(query);
@@ -249,22 +316,27 @@ export default function AdvancedOcrPage() {
       <header className="space-y-3">
         <div className="inline-flex items-center gap-2 rounded-full border border-teal-200 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800">
           <Sparkles size={14} className="text-teal-600" />
-          <span>Document AI • Vision OCR Engine</span>
+          <span>{t("Document AI • Vision OCR Engine")}</span>
         </div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-          Advanced Document OCR
+        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-4xl">
+          {t("Advanced Document OCR")}
         </h1>
-        <p className="max-w-3xl text-sm leading-relaxed text-slate-600 sm:text-base">
-          Extract layout-aware semantic blocks (text, tables, formulas, visuals) directly from any PDF document.
-          Instant Document AI processing — your files are analyzed ephemerally and never saved to permanent storage.
+        <p className="max-w-3xl text-sm leading-relaxed text-slate-600 dark:text-slate-400 sm:text-base">
+          {t(
+            "Extract text, tables and page sections from a PDF. Choose the page range and document language, then review or download the result.",
+            "استخرج النص والجداول وأقسام الصفحات من ملف PDF. اختر نطاق الصفحات ولغة المستند، ثم راجع النتيجة أو نزّلها.",
+          )}
         </p>
       </header>
 
       {/* Upload and Configuration Form */}
       <form onSubmit={handleSubmit} className="surface space-y-6 p-6 sm:p-8">
         <div>
-          <label htmlFor={fileInputId} className="block text-sm font-semibold text-slate-900 mb-2">
-            Upload PDF Document
+          <label
+            htmlFor={fileInputId}
+            className="block text-sm font-semibold text-slate-900 dark:text-slate-100 mb-2"
+          >
+            {t("Upload PDF Document")}
           </label>
 
           {!file ? (
@@ -273,20 +345,29 @@ export default function AdvancedOcrPage() {
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
               onClick={() => fileInputRef.current?.click()}
+              role="button"
+              tabIndex={busy ? -1 : 0}
+              aria-disabled={busy}
+              onKeyDown={(event) => {
+                if (!busy && (event.key === "Enter" || event.key === " ")) {
+                  event.preventDefault();
+                  fileInputRef.current?.click();
+                }
+              }}
               className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 transition-colors ${
                 isDragging
                   ? "border-teal-500 bg-teal-50/50"
-                  : "border-slate-300 bg-slate-50/50 hover:border-teal-400 hover:bg-slate-50"
+                  : "border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 hover:border-teal-400 hover:bg-slate-50"
               }`}
             >
               <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-100 text-teal-700">
                 <UploadCloud size={24} />
               </div>
-              <p className="mt-3 text-sm font-medium text-slate-800">
-                Click or drag &amp; drop a PDF here
+              <p className="mt-3 text-sm font-medium text-slate-800 dark:text-slate-200">
+                {t("Click or drag & drop a PDF here")}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
-                PDF documents • {UPLOAD_LIMIT_LABEL}
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {t("PDF documents", "ملفات PDF")} • {t(UPLOAD_LIMIT_LABEL)}
               </p>
               <input
                 id={fileInputId}
@@ -309,12 +390,16 @@ export default function AdvancedOcrPage() {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-slate-900">{file.name}</p>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      {file.name}
+                    </p>
                     <span className="rounded bg-teal-100 px-1.5 py-0.5 text-[10px] font-semibold text-teal-800">
                       PDF
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500">{formatBytes(file.size)}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {formatBytes(file.size)}
+                  </p>
                 </div>
               </div>
 
@@ -327,7 +412,7 @@ export default function AdvancedOcrPage() {
                   onClick={() => fileInputRef.current?.click()}
                   leftIcon={<RefreshCw size={14} />}
                 >
-                  Change
+                  {t("Change")}
                 </Button>
                 <button
                   type="button"
@@ -339,7 +424,7 @@ export default function AdvancedOcrPage() {
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
                   className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
-                  aria-label="Remove selected PDF"
+                  aria-label={t("Remove selected PDF")}
                 >
                   <X size={18} />
                 </button>
@@ -363,8 +448,8 @@ export default function AdvancedOcrPage() {
 
         {/* Extraction Settings */}
         <div className="grid gap-5 sm:grid-cols-3">
-          <label className="text-sm font-medium text-slate-700">
-            Start page
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {t("Start page")}
             <input
               required
               disabled={busy}
@@ -372,19 +457,21 @@ export default function AdvancedOcrPage() {
               min={1}
               max={3}
               value={startPage}
-              onChange={(e) => setStartPage(Math.max(1, Number(e.target.value) || 1))}
+              onChange={(e) =>
+                setStartPage(Math.max(1, Number(e.target.value) || 1))
+              }
               className={fieldClass}
             />
           </label>
 
-          <label className="text-sm font-medium text-slate-700">
-            End page (optional)
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {t("End page (optional)")}
             <input
               disabled={busy}
               type="number"
               min={startPage}
               max={3}
-              placeholder="e.g. 3 (default: all pages)"
+              placeholder={t("e.g. 3 (default: all pages)")}
               value={endPage}
               onChange={(e) => {
                 const val = e.target.value;
@@ -394,28 +481,33 @@ export default function AdvancedOcrPage() {
             />
           </label>
 
-          <label className="text-sm font-medium text-slate-700">
-            Language hint
+          <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            {t("Language hint")}
             <select
               disabled={busy}
               value={language}
               onChange={(e) => setLanguage(e.target.value as typeof language)}
               className={fieldClass}
             >
-              <option value="auto">Auto detect language</option>
-              <option value="ar">Arabic (العربية)</option>
-              <option value="en">English</option>
-              <option value="mixed">Arabic &amp; English (Mixed)</option>
+              <option value="auto">{t("Auto detect language")}</option>
+              <option value="ar">{t("Arabic (العربية)")}</option>
+              <option value="en">{t("English")}</option>
+              <option value="mixed">{t("Arabic & English (Mixed)")}</option>
             </select>
           </label>
         </div>
 
         {/* Information note */}
-        <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3.5 text-xs text-slate-500 dark:bg-slate-900/60 dark:text-slate-400 border border-slate-200 dark:border-slate-800">
-          <FileCheck2 size={16} className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <div className="flex items-start gap-2 rounded-xl bg-slate-50 p-3.5 text-xs text-slate-500 dark:text-slate-400 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800">
+          <FileCheck2
+            size={16}
+            className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400"
+          />
           <span>
-            Uploads are limited to 5 MB and 3 pages. Content adapts to your document layout, preserving reading
-            continuity across page breaks. Stateless Document AI processing — your files are processed ephemerally and never saved.
+            {t(
+              "Upload a PDF up to 5 MB and 3 pages. Scans with clear text give better results. Check the extracted content against the original before using it.",
+              "ارفع ملف PDF بحجم لا يتجاوز 5 ميغابايت و3 صفحات. تعطي الصور الممسوحة ذات النص الواضح نتائج أفضل. راجع المحتوى المستخرج بمقارنته مع الأصل قبل استخدامه.",
+            )}
           </span>
         </div>
 
@@ -427,39 +519,52 @@ export default function AdvancedOcrPage() {
             className="bg-gradient-to-r from-teal-700 to-emerald-600 px-6 font-medium text-white hover:from-teal-800 hover:to-emerald-700 disabled:opacity-50"
             leftIcon={busy ? <Spinner size={16} /> : <ScanText size={18} />}
           >
-            {busy ? "Analyzing PDF with Vision AI…" : "Extract Document Blocks"}
+            {busy
+              ? t("Analyzing PDF with Vision AI…")
+              : t("Extract Document Blocks")}
           </Button>
 
           {busy && (
-            <p role="status" className="text-sm text-slate-500 flex items-center gap-2">
-              Processing PDF pages in order. This may take a few moments for large documents…
+            <p
+              role="status"
+              className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-2"
+            >
+              {t(
+                "Processing PDF pages in order. This may take a few moments for large documents…",
+              )}
             </p>
           )}
         </div>
 
         {/* Error Alert */}
         {error && (
-          <div role="alert" className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
+          >
             <AlertCircle size={18} className="mt-0.5 shrink-0 text-red-600" />
-            <span>{error}</span>
+            <span>{t(error)}</span>
           </div>
         )}
       </form>
 
       {/* OCR Results Section */}
       {result && (
-        <section className="space-y-6" aria-label="OCR extraction results">
+        <section className="space-y-6" aria-label={t("OCR extraction results")}>
           {/* Result Header & Actions */}
           <div className="surface flex flex-wrap items-center justify-between gap-4 p-5 sm:p-6">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-bold text-slate-900">{result.filename || file?.name}</h2>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+                  {result.filename || file?.name}
+                </h2>
                 <span className="rounded-md border border-teal-200 bg-teal-50 px-2 py-0.5 text-xs font-semibold text-teal-800">
-                  Ready
+                  {t("Ready")}
                 </span>
               </div>
-              <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-                {result.processed_pages} {result.processed_pages === 1 ? "page" : "pages"} processed ·{" "}
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 sm:text-sm">
+                {result.processed_pages}{" "}
+                {result.processed_pages === 1 ? t("page") : "pages"} processed ·{" "}
                 {result.block_count} semantic blocks extracted
               </p>
             </div>
@@ -471,7 +576,7 @@ export default function AdvancedOcrPage() {
                 onClick={downloadJson}
                 leftIcon={<Download size={15} />}
               >
-                Download JSON
+                {t("Download JSON")}
               </Button>
               <Button
                 variant="outline"
@@ -479,15 +584,21 @@ export default function AdvancedOcrPage() {
                 onClick={downloadMarkdown}
                 leftIcon={<Download size={15} />}
               >
-                Download Markdown
+                {t("Download Markdown")}
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
                 onClick={copyAllText}
-                leftIcon={copied ? <Check size={15} className="text-teal-600" /> : <Copy size={15} />}
+                leftIcon={
+                  copied ? (
+                    <Check size={15} className="text-teal-600" />
+                  ) : (
+                    <Copy size={15} />
+                  )
+                }
               >
-                {copied ? "Copied!" : "Copy Text"}
+                {copied ? t("Copied!") : t("Copy Text")}
               </Button>
               <Button
                 variant="outline"
@@ -499,14 +610,14 @@ export default function AdvancedOcrPage() {
                 }}
                 leftIcon={<RefreshCw size={14} />}
               >
-                Upload New PDF
+                {t("Upload New PDF")}
               </Button>
             </div>
           </div>
 
           {/* View Toolbar: View Modes & Filters */}
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex rounded-xl border border-slate-200 bg-white p-1 text-xs font-medium text-slate-600 shadow-sm">
+            <div className="flex rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-1 text-xs font-medium text-slate-600 dark:text-slate-400 shadow-sm">
               <button
                 type="button"
                 onClick={() => setViewMode("blocks")}
@@ -517,7 +628,7 @@ export default function AdvancedOcrPage() {
                 }`}
               >
                 <Layers size={14} />
-                <span>Semantic Blocks</span>
+                <span>{t("Semantic Blocks")}</span>
               </button>
               <button
                 type="button"
@@ -529,7 +640,7 @@ export default function AdvancedOcrPage() {
                 }`}
               >
                 <AlignLeft size={14} />
-                <span>Full Text</span>
+                <span>{t("Full Text")}</span>
               </button>
               <button
                 type="button"
@@ -541,7 +652,7 @@ export default function AdvancedOcrPage() {
                 }`}
               >
                 <FileCode size={14} />
-                <span>Raw JSON</span>
+                <span>{t("Raw JSON")}</span>
               </button>
             </div>
 
@@ -549,19 +660,22 @@ export default function AdvancedOcrPage() {
               <div className="flex flex-wrap items-center gap-3">
                 {/* Search in blocks */}
                 <div className="relative">
-                  <Search size={14} className="absolute left-3 top-2.5 text-slate-400" />
+                  <Search
+                    size={14}
+                    className="absolute start-3 top-2.5 text-slate-400"
+                  />
                   <input
                     type="text"
-                    placeholder="Search blocks…"
+                    placeholder={t("Search blocks…")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-9 w-48 rounded-xl border border-slate-300 bg-white pl-8 pr-3 text-xs focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:w-60"
+                    className="h-9 w-48 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 ps-8 pe-3 text-xs focus:border-teal-600 focus:outline-none focus:ring-1 focus:ring-teal-600 sm:w-60"
                   />
                   {searchQuery && (
                     <button
                       type="button"
                       onClick={() => setSearchQuery("")}
-                      className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                      className="absolute end-2.5 top-2.5 text-slate-400 hover:text-slate-600"
                     >
                       <X size={14} />
                     </button>
@@ -570,22 +684,49 @@ export default function AdvancedOcrPage() {
 
                 {/* Block Type Filters */}
                 <div className="flex flex-wrap items-center gap-1 text-xs">
-                  {(["all", "paragraph", "title", "table", "formula", "image"] as BlockTypeFilter[]).map(
-                    (filter) => (
-                      <button
-                        key={filter}
-                        type="button"
-                        onClick={() => setBlockFilter(filter)}
-                        className={`rounded-lg px-2.5 py-1 capitalize transition-colors ${
-                          blockFilter === filter
-                            ? "bg-teal-100 font-semibold text-teal-800"
-                            : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                        }`}
-                      >
-                        {filter}
-                      </button>
-                    )
-                  )}
+                  {(
+                    [
+                      "all",
+                      "paragraph",
+                      "title",
+                      "table",
+                      "formula",
+                      "image",
+                    ] as BlockTypeFilter[]
+                  ).map((filter) => (
+                    <button
+                      key={t(
+                        filter,
+                        {
+                          all: "الكل",
+                          paragraph: "الفقرات",
+                          title: "العناوين",
+                          table: "الجداول",
+                          formula: "المعادلات",
+                          image: "الصور",
+                        }[filter],
+                      )}
+                      type="button"
+                      onClick={() => setBlockFilter(filter)}
+                      className={`rounded-lg px-2.5 py-1 capitalize transition-colors ${
+                        blockFilter === filter
+                          ? "bg-teal-100 font-semibold text-teal-800"
+                          : "bg-slate-100 text-slate-600 dark:text-slate-400 hover:bg-slate-200"
+                      }`}
+                    >
+                      {t(
+                        filter,
+                        {
+                          all: "الكل",
+                          paragraph: "الفقرات",
+                          title: "العناوين",
+                          table: "الجداول",
+                          formula: "المعادلات",
+                          image: "الصور",
+                        }[filter],
+                      )}
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
@@ -597,12 +738,16 @@ export default function AdvancedOcrPage() {
               {result.pages.map((page) => {
                 const visibleBlocks = page.blocks.filter(filterBlock);
                 return (
-                  <article key={page.page_number} className="surface space-y-4 p-5 sm:p-6">
+                  <article
+                    key={page.page_number}
+                    className="surface space-y-4 p-5 sm:p-6"
+                  >
                     <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                      <h3 className="text-base font-semibold text-slate-900">
+                      <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                         Page {page.page_number}
-                        <span className="ml-2 text-xs font-normal text-slate-500">
-                          ({visibleBlocks.length} of {page.block_count} blocks shown)
+                        <span className="ms-2 text-xs font-normal text-slate-500 dark:text-slate-400">
+                          ({visibleBlocks.length} {t("of")}
+                          {page.block_count} blocks shown)
                         </span>
                       </h3>
                     </div>
@@ -610,8 +755,10 @@ export default function AdvancedOcrPage() {
                     {visibleBlocks.length === 0 && (
                       <p className="py-4 text-center text-sm text-slate-400">
                         {page.blocks.length === 0
-                          ? "No visible blocks detected on this page."
-                          : "No blocks match the current filter or search criteria."}
+                          ? t("No visible blocks detected on this page.")
+                          : t(
+                              "No blocks match the current filter or search criteria.",
+                            )}
                       </p>
                     )}
 
@@ -619,18 +766,20 @@ export default function AdvancedOcrPage() {
                       {visibleBlocks.map((block) => (
                         <div
                           key={block.id}
-                          className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 transition-all hover:border-slate-300 hover:bg-slate-50"
+                          className="rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-900/70 p-4 transition-all hover:border-slate-300 hover:bg-slate-50"
                         >
                           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
                             <div className="flex flex-wrap items-center gap-2">
                               <span
                                 className={`rounded-md border px-2 py-0.5 font-semibold uppercase tracking-wider text-[11px] ${getBlockBadgeStyle(
-                                  block.type
+                                  block.type,
                                 )}`}
                               >
                                 {block.type}
                               </span>
-                              <span className="font-mono text-slate-500">{block.id}</span>
+                              <span className="font-mono text-slate-500 dark:text-slate-400">
+                                {block.id}
+                              </span>
                               {block.previous_block_id && (
                                 <span className="inline-flex items-center gap-1 rounded bg-teal-50 px-1.5 py-0.5 text-teal-700 border border-teal-100 font-medium">
                                   <LinkIcon size={11} />
@@ -651,12 +800,12 @@ export default function AdvancedOcrPage() {
                             {typeof block.content === "string" ? (
                               <div
                                 dir="auto"
-                                className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-800"
+                                className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-slate-800 dark:text-slate-200"
                               >
                                 {block.content}
                               </div>
                             ) : (
-                              <pre className="overflow-x-auto rounded-lg bg-white p-3 font-mono text-xs leading-5 text-slate-800 border border-slate-200">
+                              <pre className="overflow-x-auto rounded-lg bg-white dark:bg-slate-900 p-3 font-mono text-xs leading-5 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-700">
                                 {JSON.stringify(block.content, null, 2)}
                               </pre>
                             )}
@@ -664,13 +813,13 @@ export default function AdvancedOcrPage() {
 
                           {/* OCR Transcription Accordion */}
                           {block.ocr_text && (
-                            <details className="mt-3 text-xs text-slate-600">
-                              <summary className="cursor-pointer font-medium text-slate-500 hover:text-slate-800">
-                                OCR raw transcription
+                            <details className="mt-3 text-xs text-slate-600 dark:text-slate-400">
+                              <summary className="cursor-pointer font-medium text-slate-500 dark:text-slate-400 hover:text-slate-800">
+                                {t("OCR raw transcription")}
                               </summary>
                               <pre
                                 dir="auto"
-                                className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-white p-3 font-mono leading-5 text-slate-700"
+                                className="mt-2 whitespace-pre-wrap break-words rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 font-mono leading-5 text-slate-700 dark:text-slate-300"
                               >
                                 {block.ocr_text}
                               </pre>
@@ -678,11 +827,11 @@ export default function AdvancedOcrPage() {
                           )}
 
                           {/* Details JSON Accordion */}
-                          <details className="mt-2 text-xs text-slate-500">
+                          <details className="mt-2 text-xs text-slate-500 dark:text-slate-400">
                             <summary className="cursor-pointer hover:text-slate-700">
-                              JSON metadata &amp; fields
+                              {t("JSON metadata & fields")}
                             </summary>
-                            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-slate-200 bg-slate-100 p-2.5 font-mono text-[11px] text-slate-700">
+                            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100 p-2.5 font-mono text-[11px] text-slate-700 dark:text-slate-300">
                               {JSON.stringify(block, null, 2)}
                             </pre>
                           </details>
@@ -699,19 +848,27 @@ export default function AdvancedOcrPage() {
           {viewMode === "text" && (
             <article className="surface space-y-4 p-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-base font-semibold text-slate-900">Extracted Document Text</h3>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                  Extracted Document Text
+                </h3>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={copyAllText}
-                  leftIcon={copied ? <Check size={14} className="text-teal-600" /> : <Copy size={14} />}
+                  leftIcon={
+                    copied ? (
+                      <Check size={14} className="text-teal-600" />
+                    ) : (
+                      <Copy size={14} />
+                    )
+                  }
                 >
-                  {copied ? "Copied" : "Copy All"}
+                  {copied ? t("Copied") : "Copy All"}
                 </Button>
               </div>
               <pre
                 dir="auto"
-                className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-800"
+                className="max-h-[70vh] overflow-y-auto whitespace-pre-wrap font-sans text-sm leading-relaxed text-slate-800 dark:text-slate-200"
               >
                 {result.ocr_text ||
                   result.pages
@@ -719,8 +876,10 @@ export default function AdvancedOcrPage() {
                       p.blocks.map(
                         (b) =>
                           b.ocr_text ||
-                          (typeof b.content === "string" ? b.content : JSON.stringify(b.content))
-                      )
+                          (typeof b.content === "string"
+                            ? b.content
+                            : JSON.stringify(b.content)),
+                      ),
                     )
                     .join("\n\n")}
               </pre>
@@ -731,21 +890,31 @@ export default function AdvancedOcrPage() {
           {viewMode === "json" && (
             <article className="surface space-y-4 p-6">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-base font-semibold text-slate-900">Full JSON Response</h3>
+                <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+                  Full JSON Response
+                </h3>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => {
-                    navigator.clipboard.writeText(JSON.stringify(result, null, 2));
+                    navigator.clipboard.writeText(
+                      JSON.stringify(result, null, 2),
+                    );
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
                   }}
-                  leftIcon={copied ? <Check size={14} className="text-teal-600" /> : <Copy size={14} />}
+                  leftIcon={
+                    copied ? (
+                      <Check size={14} className="text-teal-600" />
+                    ) : (
+                      <Copy size={14} />
+                    )
+                  }
                 >
-                  {copied ? "Copied" : "Copy JSON"}
+                  {copied ? t("Copied") : "Copy JSON"}
                 </Button>
               </div>
-              <pre className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200 bg-slate-900 p-4 font-mono text-xs leading-5 text-slate-100">
+              <pre className="max-h-[70vh] overflow-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-900 p-4 font-mono text-xs leading-5 text-slate-100">
                 {JSON.stringify(result, null, 2)}
               </pre>
             </article>

@@ -1,4 +1,6 @@
 "use client";
+import { useLanguage } from "@/components/providers/language-provider";
+import { serviceCatalog } from "@/lib/service-catalog";
 import { UPLOAD_LIMIT_LABEL } from "@/lib/upload-limits";
 
 import { useEffect, useState, useMemo } from "react";
@@ -52,6 +54,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 export default function PlaygroundPage() {
+  const { t, language: interfaceLanguage } = useLanguage();
   const searchParams = useSearchParams();
   const router = useRouter();
   const serviceKey = searchParams.get("service") || "invoice";
@@ -618,7 +621,8 @@ console.log("TTL Status:", status);`;
     );
   }
 
-  const serviceTitle = preset?.name || serviceKey;
+  const catalogService = serviceCatalog.find((service) => service.id === serviceKey);
+  const serviceTitle = catalogService?.title[interfaceLanguage] || preset?.name || serviceKey;
 
   return (
     <div className="mx-auto max-w-7xl animate-enter space-y-4">
@@ -629,7 +633,7 @@ console.log("TTL Status:", status);`;
             <div className="flex items-center gap-2 text-xs font-semibold text-slate-400">
               <Link href="/services" className="hover:text-slate-800 transition flex items-center gap-1">
                 <ArrowLeft size={13} />
-                <span>AI Services</span>
+                <span>{t("AI Services")}</span>
               </Link>
               <span>/</span>
               <span className="font-mono text-slate-700 uppercase tracking-wider text-[11px] font-semibold">{serviceKey}</span>
@@ -643,14 +647,13 @@ console.log("TTL Status:", status);`;
                 {defaultEnvModel}
               </span>
               <span className="hidden sm:inline-flex items-center gap-1 rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[10px] font-medium text-slate-600 border border-slate-200">
-                REST API Sandbox
-              </span>
+                {t("REST API Sandbox")}</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="hidden lg:inline-flex text-[11px] font-mono text-slate-400">
-              Press <kbd className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600 font-mono">⌘+↵</kbd>
+              {t("Press")}<kbd className="rounded border border-slate-300 bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600 font-mono">⌘+↵</kbd>
             </span>
 
             <Button
@@ -661,7 +664,7 @@ console.log("TTL Status:", status);`;
               className="h-9 gap-1.5 border-slate-300 bg-white font-medium text-slate-700 hover:bg-slate-50 text-xs shadow-2xs"
             >
               <Code2 size={14} className="text-[#087f74]" />
-              <span>&lt;/&gt; API Documentation &amp; Code ↓</span>
+              <span>{t("</> API Documentation & Code ↓")}</span>
             </Button>
 
             <Button
@@ -674,7 +677,7 @@ console.log("TTL Status:", status);`;
               ) : (
                 <Play size={13} className="fill-current" />
               )}
-              <span>{isRunning ? "Executing..." : `Run ${serviceTitle}`}</span>
+              <span>{isRunning ? t("Running…", "جارٍ التشغيل…") : t(`Run ${serviceTitle}`, `تشغيل ${serviceTitle}`)}</span>
             </Button>
           </div>
         </div>
@@ -687,8 +690,7 @@ console.log("TTL Status:", status);`;
           {/* Top Panel Header: Segmented Source Selector */}
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/80 px-4 py-2">
             <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">
-              Input Source
-            </span>
+              {t("Input Source")}</span>
             <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 text-xs shadow-2xs font-medium">
               <button
                 type="button"
@@ -700,7 +702,7 @@ console.log("TTL Status:", status);`;
                 }`}
               >
                 <FileText size={12} />
-                <span>Document ({docs.length})</span>
+                <span>{t("Document (")}{docs.length})</span>
               </button>
               <button
                 type="button"
@@ -717,7 +719,7 @@ console.log("TTL Status:", status);`;
                 }`}
               >
                 <Code2 size={12} />
-                <span>Direct Text</span>
+                <span>{t("Direct Text")}</span>
               </button>
             </div>
           </div>
@@ -733,10 +735,10 @@ console.log("TTL Status:", status);`;
                       onChange={(e) => setSelectedDocId(e.target.value)}
                       className="h-9 w-full appearance-none rounded-lg border border-slate-300 bg-white px-3 pr-8 text-xs font-semibold text-slate-900 shadow-2xs hover:border-slate-400 focus:border-teal-600 focus:outline-none"
                     >
-                      {docs.length === 0 && <option value="">No files uploaded yet</option>}
+                      {docs.length === 0 && <option value="">{t("No files uploaded yet")}</option>}
                       {docs.map((d) => (
                         <option key={d.id} value={d.id}>
-                          {d.filename} ({d.pageCount} {d.pageCount === 1 ? "page" : "pages"})
+                          {d.filename} ({d.pageCount} {d.pageCount === 1 ? t("page") : "pages"})
                         </option>
                       ))}
                     </select>
@@ -772,7 +774,7 @@ console.log("TTL Status:", status);`;
                   }`}
                 >
                   <p className="text-[11px] text-slate-500">
-                    Drag &amp; drop PDF or document here • {UPLOAD_LIMIT_LABEL}
+                    {t("Drag & drop PDF or document here •")}{t(UPLOAD_LIMIT_LABEL)}
                   </p>
                 </div>
 
@@ -790,8 +792,7 @@ console.log("TTL Status:", status);`;
                       <span className="font-semibold text-slate-800 truncate text-[11px]">{selectedDoc.filename}</span>
                     </div>
                     <span className="shrink-0 font-mono text-[10px] text-slate-500">
-                      {selectedDoc.pageCount} {selectedDoc.pageCount === 1 ? "page" : "pages"} • OCR Ready
-                    </span>
+                      {selectedDoc.pageCount} {selectedDoc.pageCount === 1 ? t("page") : "pages"} {t("• OCR Ready")}</span>
                   </div>
                 )}
               </div>
@@ -799,22 +800,21 @@ console.log("TTL Status:", status);`;
               /* Text Source View */
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Direct text context:</span>
+                  <span>{t("Direct text context:")}</span>
                   {preset?.sample_text && (
                     <button
                       type="button"
                       onClick={() => setTextContent(preset.sample_text)}
                       className="text-teal-700 hover:underline flex items-center gap-1 font-medium"
                     >
-                      <RotateCcw size={10} /> Reset Sample
-                    </button>
+                      <RotateCcw size={10} /> {t("Reset Sample")}</button>
                   )}
                 </div>
                 <textarea
                   value={textContent}
                   onChange={(e) => setTextContent(e.target.value)}
                   rows={4}
-                  placeholder="Paste document text or invoice OCR output..."
+                  placeholder={t("Paste document text or invoice OCR output...")}
                   className="w-full rounded-lg border border-slate-200 bg-[#fafbfc] p-3 font-mono text-xs text-slate-900 focus:border-teal-600 focus:bg-white focus:outline-none"
                 />
               </div>
@@ -823,13 +823,12 @@ console.log("TTL Status:", status);`;
             {/* Task Prompt / Instruction */}
             <div className="space-y-1">
               <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                Task Query / Prompt
-              </label>
+                {t("Task Query / Prompt")}</label>
               <input
                 type="text"
                 value={userPrompt}
                 onChange={(e) => setUserPrompt(e.target.value)}
-                placeholder="e.g. Extract structured invoice data, itemized rows, and calculate VAT."
+                placeholder={t("e.g. Extract structured invoice data, itemized rows, and calculate VAT.")}
                 className="h-9 w-full rounded-lg border border-slate-300 px-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-teal-600 focus:outline-none shadow-2xs font-medium"
               />
             </div>
@@ -838,8 +837,7 @@ console.log("TTL Status:", status);`;
             <div className="space-y-2 pt-1 border-t border-slate-100">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold text-slate-800">
-                  Target JSON Schema
-                </span>
+                  {t("Target JSON Schema")}</span>
 
                 <div className="flex items-center gap-2 text-[11px]">
                   <span
@@ -861,8 +859,7 @@ console.log("TTL Status:", status);`;
                     disabled={!isSchemaValid}
                     className="text-slate-600 hover:text-slate-900 disabled:opacity-40"
                   >
-                    Format
-                  </button>
+                    {t("Format")}</button>
                   <span className="text-slate-300">•</span>
                   <button
                     type="button"
@@ -873,8 +870,7 @@ console.log("TTL Status:", status);`;
                     }
                     className="text-teal-700 hover:underline"
                   >
-                    Reset
-                  </button>
+                    {t("Reset")}</button>
                 </div>
               </div>
 
@@ -882,7 +878,7 @@ console.log("TTL Status:", status);`;
                 value={schemaText}
                 onChange={(e) => setSchemaText(e.target.value)}
                 rows={7}
-                placeholder="Target JSON schema template..."
+                placeholder={t("Target JSON schema template...")}
                 className="w-full rounded-lg border border-slate-800 bg-[#0c1222] p-3 font-mono text-[11px] leading-relaxed text-emerald-400 focus:outline-none"
               />
             </div>
@@ -902,8 +898,7 @@ console.log("TTL Status:", status);`;
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                Structured JSON
-              </button>
+                {t("Structured JSON")}</button>
               <button
                 onClick={() => setActiveTab("blocks")}
                 className={`rounded px-2.5 py-1 text-xs transition ${
@@ -912,8 +907,7 @@ console.log("TTL Status:", status);`;
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                Layout Blocks
-              </button>
+                {t("Layout Blocks")}</button>
               <button
                 onClick={() => setActiveTab("rendered")}
                 className={`rounded px-2.5 py-1 text-xs transition ${
@@ -922,8 +916,7 @@ console.log("TTL Status:", status);`;
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                Raw Text
-              </button>
+                {t("Raw Text")}</button>
               <button
                 onClick={() => setActiveTab("steps")}
                 className={`rounded px-2.5 py-1 text-xs transition ${
@@ -932,7 +925,7 @@ console.log("TTL Status:", status);`;
                     : "text-slate-600 hover:text-slate-900"
                 }`}
               >
-                Agent Steps ({result?.steps?.length || 0})
+                {t("Agent Steps (")}{result?.steps?.length || 0})
               </button>
             </div>
 
@@ -955,14 +948,14 @@ console.log("TTL Status:", status);`;
                     className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-2xs"
                   >
                     {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                    <span>{copied ? "Copied" : "Copy"}</span>
+                    <span>{copied ? t("Copied") : t("Copy")}</span>
                   </button>
                   <button
                     onClick={() => handleDownload(result.data)}
                     className="flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50 transition shadow-2xs"
                   >
                     <Download size={12} />
-                    <span>Export</span>
+                    <span>{t("Export")}</span>
                   </button>
                 </div>
               )}
@@ -976,11 +969,9 @@ console.log("TTL Status:", status);`;
               <div className="flex h-96 flex-col items-center justify-center text-center">
                 <Spinner size={24} className="text-teal-700" />
                 <p className="mt-3 text-xs font-semibold text-slate-800">
-                  Executing {serviceTitle} Pipeline...
-                </p>
+                  {t("Executing")}{serviceTitle} {t("Pipeline...")}</p>
                 <p className="mt-1 font-mono text-[11px] text-slate-400">
-                  Running model {defaultEnvModel} with layout verification
-                </p>
+                  {t("Running model")}{defaultEnvModel} {t("with layout verification")}</p>
               </div>
             )}
 
@@ -989,7 +980,7 @@ console.log("TTL Status:", status);`;
               <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-4 text-xs text-red-800">
                 <AlertCircle size={15} className="shrink-0 text-red-600 mt-0.5" />
                 <div>
-                  <p className="font-semibold">Pipeline Execution Failed</p>
+                  <p className="font-semibold">{t("Pipeline Execution Failed")}</p>
                   <p className="mt-0.5 text-[11px] leading-relaxed font-mono">{error}</p>
                 </div>
               </div>
@@ -1013,10 +1004,10 @@ console.log("TTL Status:", status);`;
                         <div key={idx} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-xs space-y-1.5">
                           <div className="flex items-center justify-between">
                             <span className="font-mono text-[10px] font-bold uppercase rounded bg-slate-200 px-1.5 py-0.5 text-slate-700">
-                              Block #{blk.metadata?.reading_order || idx + 1} • {blk.type}
+                              {t("Block #")}{blk.metadata?.reading_order || idx + 1} • {blk.type}
                             </span>
                             <span className="font-mono text-[10px] text-slate-400">
-                              page {blk.metadata?.page_number || 1}
+                              {t("page")}{blk.metadata?.page_number || 1}
                             </span>
                           </div>
                           {blk.title && (
@@ -1028,7 +1019,7 @@ console.log("TTL Status:", status);`;
                             </pre>
                           ) : blk.image?.description ? (
                             <p className="italic text-teal-800 bg-teal-50 p-2 rounded border border-teal-200">
-                              Image: {blk.image.description}
+                              {t("Image:")}{blk.image.description}
                             </p>
                           ) : (
                             <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">{blk.content}</p>
@@ -1037,10 +1028,9 @@ console.log("TTL Status:", status);`;
                       ))
                     ) : (
                       <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-6 text-center text-xs text-slate-500">
-                        <p>Direct JSON payload received.</p>
+                        <p>{t("Direct JSON payload received.")}</p>
                         <p className="mt-1 text-[11px] text-slate-400 font-mono">
-                          Inspect the Structured JSON tab to view extracted fields.
-                        </p>
+                          {t("Inspect the Structured JSON tab to view extracted fields.")}</p>
                       </div>
                     )}
                   </div>
@@ -1064,7 +1054,7 @@ console.log("TTL Status:", status);`;
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-teal-800 font-mono text-[11px]">
-                              Step {idx + 1}: {st.action || "Agent Reasoning"}
+                              {t("Step")}{idx + 1}: {st.action || "Agent Reasoning"}
                             </span>
                           </div>
                           {st.thought && <p className="italic text-slate-600 text-[11px]">{st.thought}</p>}
@@ -1077,8 +1067,7 @@ console.log("TTL Status:", status);`;
                       ))
                     ) : (
                       <p className="p-4 text-xs text-slate-500 text-center">
-                        Single-pass direct model execution completed without multi-step iterations.
-                      </p>
+                        {t("Single-pass direct model execution completed without multi-step iterations.")}</p>
                     )}
                   </div>
                 )}
@@ -1091,13 +1080,13 @@ console.log("TTL Status:", status);`;
                 <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 mb-3 border border-slate-200">
                   <Code2 size={22} />
                 </div>
-                <p className="text-sm font-semibold text-slate-800">Ready to execute</p>
+                <p className="text-sm font-semibold text-slate-800">{t("Ready to execute")}</p>
                 <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                  Click <span className="font-semibold text-slate-700">Run</span> or press{" "}
+                  {t("Click")}<span className="font-semibold text-slate-700">{t("Run")}</span> {t("or press")}{" "}
                   <kbd className="rounded border border-slate-300 bg-slate-100 px-1 py-0.5 text-[10px] font-mono text-slate-600">
                     ⌘+Enter
                   </kbd>{" "}
-                  to execute pipeline with <span className="font-mono text-teal-700 font-semibold">{defaultEnvModel}</span>.
+                  {t("to execute pipeline with")}<span className="font-mono text-teal-700 font-semibold">{defaultEnvModel}</span>.
                 </p>
               </div>
             )}
@@ -1141,14 +1130,14 @@ console.log("TTL Status:", status);`;
               className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition shadow-sm"
             >
               <BookOpen size={14} />
-              <span>Full Platform Docs ↗</span>
+              <span>{t("Full Platform Docs ↗")}</span>
             </Link>
             <Link
               href="/usage"
               className="inline-flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-800 hover:bg-teal-100 transition shadow-2xs"
             >
               <Zap size={14} className="text-teal-600 fill-teal-600" />
-              <span>Usage Logs &amp; Quotas →</span>
+              <span>{t("Usage Logs & Quotas →")}</span>
             </Link>
           </div>
         </div>
@@ -1226,10 +1215,9 @@ console.log("TTL Status:", status);`;
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-              Select API Endpoint
-            </span>
+              {t("Select API Endpoint")}</span>
             <span className="text-[11px] text-slate-400">
-              Active Service: <span className="font-semibold text-teal-700">{serviceTitle}</span>
+              {t("Active Service:")}<span className="font-semibold text-teal-700">{serviceTitle}</span>
             </span>
           </div>
 
@@ -1290,8 +1278,7 @@ console.log("TTL Status:", status);`;
               </span>
               <span>/api/v1/ocr/advanced</span>
               <span className="rounded bg-slate-800 px-1.5 py-0.2 text-[9px] text-slate-300">
-                Layout Blocks
-              </span>
+                {t("Layout Blocks")}</span>
             </button>
 
             <button
@@ -1346,8 +1333,7 @@ console.log("TTL Status:", status);`;
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  Request Parameters
-                </button>
+                  {t("Request Parameters")}</button>
                 <button
                   onClick={() => setDocSubTab("response")}
                   className={`rounded-md px-3 py-1 transition ${
@@ -1356,8 +1342,7 @@ console.log("TTL Status:", status);`;
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  Response Schema
-                </button>
+                  {t("Response Schema")}</button>
                 <button
                   onClick={() => setDocSubTab("lifecycle")}
                   className={`rounded-md px-3 py-1 transition ${
@@ -1366,8 +1351,7 @@ console.log("TTL Status:", status);`;
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  Status &amp; Errors
-                </button>
+                  {t("Status & Errors")}</button>
               </div>
 
               <span className="text-[11px] font-mono text-slate-400">
@@ -1381,17 +1365,17 @@ console.log("TTL Status:", status);`;
                 <table className="w-full text-left text-xs">
                   <thead className="border-b border-slate-200 bg-slate-100/70 text-[11px] font-bold uppercase text-slate-500">
                     <tr>
-                      <th className="px-3.5 py-2.5">Field</th>
-                      <th className="px-3.5 py-2.5">Type &amp; In</th>
-                      <th className="px-3.5 py-2.5">Required</th>
-                      <th className="px-3.5 py-2.5">Description</th>
+                      <th className="px-3.5 py-2.5">{t("Field")}</th>
+                      <th className="px-3.5 py-2.5">{t("Type & In")}</th>
+                      <th className="px-3.5 py-2.5">{t("Required")}</th>
+                      <th className="px-3.5 py-2.5">{t("Description")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-200/70 bg-white">
                     <tr className="hover:bg-slate-50/50">
                       <td className="px-3.5 py-2 font-mono font-bold text-slate-900">X-API-Key</td>
                       <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (header)</td>
-                      <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                      <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">{t("Required")}</td>
                       <td className="px-3.5 py-2 text-slate-600 text-[11px]">Enterprise company API key.</td>
                     </tr>
 
@@ -1400,7 +1384,7 @@ console.log("TTL Status:", status);`;
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3.5 py-2 font-mono font-bold text-slate-900">file</td>
                           <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">binary (form)</td>
-                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">{t("Required")}</td>
                           <td className="px-3.5 py-2 text-slate-600 text-[11px]">PDF or document (up to 5 MB and 3 pages).</td>
                         </tr>
                         <tr className="hover:bg-slate-50/50">
@@ -1417,7 +1401,7 @@ console.log("TTL Status:", status);`;
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3.5 py-2 font-mono font-bold text-slate-900">service</td>
                           <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
-                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">{t("Required")}</td>
                           <td className="px-3.5 py-2 text-slate-600 text-[11px]">
                             Target AI pipeline (e.g. <code className="text-teal-700">{serviceKey}</code>, <code>contract</code>, <code>compliance</code>).
                           </td>
@@ -1425,7 +1409,7 @@ console.log("TTL Status:", status);`;
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3.5 py-2 font-mono font-bold text-slate-900">document_id</td>
                           <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
-                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                          <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">{t("Required")}</td>
                           <td className="px-3.5 py-2 text-slate-600 text-[11px]">
                             Target session ID. <strong>⚡ Resets 10-minute inactivity timer.</strong>
                           </td>
@@ -1433,7 +1417,7 @@ console.log("TTL Status:", status);`;
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3.5 py-2 font-mono font-bold text-slate-900">output_format</td>
                           <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
-                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">Optional</td>
+                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">{t("Optional")}</td>
                           <td className="px-3.5 py-2 text-slate-600 text-[11px]">Defaults to <code>"json"</code>.</td>
                         </tr>
                       </>
@@ -1456,7 +1440,7 @@ console.log("TTL Status:", status);`;
                         <tr className="hover:bg-slate-50/50">
                           <td className="px-3.5 py-2 font-mono font-bold text-slate-900">language</td>
                           <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">string (body)</td>
-                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">Optional</td>
+                          <td className="px-3.5 py-2 font-normal text-slate-400 text-[11px]">{t("Optional")}</td>
                           <td className="px-3.5 py-2 text-slate-600 text-[11px]"><code>auto</code>, <code>ar</code>, <code>en</code>, or <code>mixed</code>.</td>
                         </tr>
                       </>
@@ -1466,7 +1450,7 @@ console.log("TTL Status:", status);`;
                       <tr className="hover:bg-slate-50/50">
                         <td className="px-3.5 py-2 font-mono font-bold text-slate-900">id</td>
                         <td className="px-3.5 py-2 font-mono text-[11px] text-slate-500">path param</td>
-                        <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">Required</td>
+                        <td className="px-3.5 py-2 font-semibold text-rose-600 text-[11px]">{t("Required")}</td>
                         <td className="px-3.5 py-2 text-slate-600 text-[11px]">The documentId to inspect.</td>
                       </tr>
                     )}
@@ -1523,7 +1507,7 @@ console.log("TTL Status:", status);`;
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-0.5">
                   <div className="flex items-center gap-1.5 font-bold text-emerald-900 font-mono">
                     <span className="rounded bg-emerald-200 px-1.5 py-0.2 text-[10px]">200 OK</span>
-                    <span>Success</span>
+                    <span>{t("Success")}</span>
                   </div>
                   <p className="text-[11px] text-emerald-800 leading-snug">
                     Processed successfully. Sliding inactivity timer renewed for 10 minutes.
@@ -1533,7 +1517,7 @@ console.log("TTL Status:", status);`;
                 <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-0.5">
                   <div className="flex items-center gap-1.5 font-bold text-amber-900 font-mono">
                     <span className="rounded bg-amber-200 px-1.5 py-0.2 text-[10px]">410 GONE</span>
-                    <span>Session Expired</span>
+                    <span>{t("Session Expired")}</span>
                   </div>
                   <p className="text-[11px] text-amber-800 leading-snug">
                     Document inactive for &gt;10 min. Automatically purged. Upload new PDF.
@@ -1543,7 +1527,7 @@ console.log("TTL Status:", status);`;
                 <div className="rounded-lg border border-rose-200 bg-rose-50/60 p-3 space-y-0.5">
                   <div className="flex items-center gap-1.5 font-bold text-rose-900 font-mono">
                     <span className="rounded bg-rose-200 px-1.5 py-0.2 text-[10px]">402 PAYMENT</span>
-                    <span>Credits Needed</span>
+                    <span>{t("Credits Needed")}</span>
                   </div>
                   <p className="text-[11px] text-rose-800 leading-snug">
                     Insufficient credit quota. Top up credits or request tier upgrade.
@@ -1553,7 +1537,7 @@ console.log("TTL Status:", status);`;
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-0.5">
                   <div className="flex items-center gap-1.5 font-bold text-slate-800 font-mono">
                     <span className="rounded bg-slate-200 px-1.5 py-0.2 text-[10px]">422 UNPROCESSABLE</span>
-                    <span>Invalid Input</span>
+                    <span>{t("Invalid Input")}</span>
                   </div>
                   <p className="text-[11px] text-slate-600 leading-snug">
                     Invalid PDF or corrupt range. Double check start_page and end_page.
@@ -1609,8 +1593,7 @@ console.log("TTL Status:", status);`;
                       : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  Multi-Service Script
-                </button>
+                  {t("Multi-Service Script")}</button>
               </div>
 
               {/* Copy Code Button */}
@@ -1631,12 +1614,12 @@ console.log("TTL Status:", status);`;
                 {codeCopied ? (
                   <>
                     <Check size={13} className="text-emerald-400" />
-                    <span className="text-emerald-400 font-bold">Copied!</span>
+                    <span className="text-emerald-400 font-bold">{t("Copied!")}</span>
                   </>
                 ) : (
                   <>
                     <Copy size={13} />
-                    <span>Copy Code</span>
+                    <span>{t("Copy Code")}</span>
                   </>
                 )}
               </button>
@@ -1647,8 +1630,7 @@ console.log("TTL Status:", status);`;
               <div className="flex items-center justify-between pb-3 mb-2 border-b border-slate-800 text-[10px] text-slate-400">
                 <span className="flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Ready to execute in terminal or backend service
-                </span>
+                  {t("Ready to execute in terminal or backend service")}</span>
                 <span className="font-mono text-slate-500">UTF-8 • REST</span>
               </div>
 
@@ -1667,7 +1649,7 @@ console.log("TTL Status:", status);`;
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-1.5">
             <div className="flex items-center gap-1.5 font-bold text-slate-800">
               <ShieldCheck size={15} className="text-emerald-600" />
-              <span>Authentication Header</span>
+              <span>{t("Authentication Header")}</span>
             </div>
             <p className="text-[11px] text-slate-500 font-mono">
               X-API-Key: {account?.apiKeyPrefix || "docu_live_"}••••••••••
@@ -1680,7 +1662,7 @@ console.log("TTL Status:", status);`;
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-1.5">
             <div className="flex items-center gap-1.5 font-bold text-slate-800">
               <Timer size={15} className="text-amber-600" />
-              <span>Configurable Sliding TTL</span>
+              <span>{t("Configurable Sliding TTL")}</span>
             </div>
             <p className="text-[11px] text-slate-700 font-semibold">
               Default: 10 min without usage
@@ -1693,7 +1675,7 @@ console.log("TTL Status:", status);`;
           <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4 space-y-1.5">
             <div className="flex items-center gap-1.5 font-bold text-slate-800">
               <Terminal size={15} className="text-teal-700" />
-              <span>Active Model Engine</span>
+              <span>{t("Active Model Engine")}</span>
             </div>
             <p className="text-[11px] text-slate-800 font-bold font-mono">
               Luna (gpt-6-luna)
